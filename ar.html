@@ -57,6 +57,7 @@ button.go:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; 
 <script type="module">
 import { build } from "./src/ramp.js";
 import { createAR } from "./src/ar.js";
+import { createPaints } from "./src/paints.js";
 
 const q = new URLSearchParams(location.search);
 const num = (k) => {
@@ -87,8 +88,13 @@ if (problem) {
   const p = model.params;
   note.textContent = `А ${p.hl} мм, Б ${p.hr} мм, ширина ${p.width} мм`.replace(/\./g, ",");
   // на своём https-адресе GLB отдаёт /api/glb (нужен Scene Viewer на Android); локально — blob
-  const src = location.protocol === "https:" ? `${location.origin}/api/glb${location.search}` : undefined;
-  const show = () => { reopen.hidden = true; ar.open(document.body, model, paint, { src, onClose: () => { reopen.hidden = false; reopen.focus(); } }); };
+  const qFor = (hex) => { const u = new URLSearchParams(location.search); u.set("paint", hex ? hex.replace(/^#/, "") : "raw"); return u; };
+  const srcFor = location.protocol === "https:" ? (hex) => `${location.origin}/api/glb?${qFor(hex)}` : undefined;
+  // цвет меняется прямо в примерке; адрес страницы запоминает его, чтобы ссылкой делиться уже в цвете
+  const onPaint = (hex) => { try { history.replaceState(null, "", `${location.pathname}?${qFor(hex)}${location.hash}`); } catch {} cur = hex; };
+  let cur = paint;
+  const paints = createPaints().list();
+  const show = () => { reopen.hidden = true; ar.open(document.body, model, cur, { srcFor, paints, onPaint, onClose: () => { reopen.hidden = false; reopen.focus(); } }); };
   reopen.addEventListener("click", show);
   show();
 }

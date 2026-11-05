@@ -33,7 +33,7 @@ function parseGLB(u8) {
     const a = json.accessors[ai], v = json.bufferViews[a.bufferView];
     assert.equal(v.byteOffset % 4, 0, "bufferView выровнен");
     assert.ok(v.byteOffset + v.byteLength <= json.buffers[0].byteLength, "bufferView внутри буфера");
-    const n = a.count * (a.type === "VEC3" ? 3 : 1);
+    const n = a.count * ({ VEC3: 3, VEC2: 2 }[a.type] || 1);
     const T = a.componentType === 5126 ? Float32Array : a.componentType === 5123 ? Uint16Array : null;
     assert.ok(T, "тип компонента");
     assert.equal(v.byteLength, n * T.BYTES_PER_ELEMENT);
@@ -141,7 +141,7 @@ test("материалы: берёза и сосна без покраски, к
   assert.equal(ply.primitives[0].material, 0);
   assert.ok(raw.meshes.filter((x) => x !== ply).every((x) => x.primitives[0].material === 1));
   const painted = parseGLB(ar.toGLB(m, "#102c54")).json;
-  for (const mat of painted.materials) assert.deepEqual(mat.pbrMetallicRoughness.baseColorFactor.slice(0, 3).map((v) => +v.toFixed(4)), [c(0x10), c(0x2C), c(0x54)].map((v) => +v.toFixed(4)));
+  for (const mat of painted.materials.slice(0, 2)) assert.deepEqual(mat.pbrMetallicRoughness.baseColorFactor.slice(0, 3).map((v) => +v.toFixed(4)), [c(0x10), c(0x2C), c(0x54)].map((v) => +v.toFixed(4)));
   assert.throws(() => ar.toGLB(m, "синий"));
 });
 
@@ -175,5 +175,45 @@ test("GLB разбирается python pygltflib (если установлен
     if (e.code === "ENOENT" || /No module named/.test(String(e.stderr))) return t.skip("pygltflib не установлен");
     throw e;
   }
-  assert.equal(out, "4 2 Пандус");
+  assert.equal(out, "5 3 Пандус", "4 детали + надпись; 2 материала + трафарет");
+});
+
+// Надпись goapsny.org (Алхас, 2026-11-05): на верхней поверхности настила, вдоль ската снизу вверх, у края А
+test("надпись goapsny.org: только на окрашенном, на верхе настила у края А, вдоль ската", () => {
+  for (const c of [{ hl: 85, hr: 70 }, { hl: 98, hr: 98 }, { hl: 240, hr: 190, width: 1000 }]) {
+    const m = build(c), W = m.params.width / 1000;
+    assert.ok(!parseGLB(ar.toGLB(m, null)).json.meshes.some((x) => x.name.includes("goapsny")), "без покраски надписи нет");
+    const glb = ar.toGLB(m, "#102C54"), { json, read } = parseGLB(glb);
+    const mesh = json.meshes.find((x) => x.name.includes("goapsny"));
+    assert.ok(mesh, "есть меш надписи");
+    const pr = mesh.primitives[0], mat = json.materials[pr.material];
+    assert.equal(mat.alphaMode, "MASK");
+    assert.equal(json.images[0].mimeType, "image/png");
+    const img = json.bufferViews[json.images[0].bufferView];
+    const bin = glb.subarray(20 + new DataView(glb.buffer).getUint32(12, true) + 8);
+    assert.deepEqual([...bin.subarray(img.byteOffset, img.byteOffset + 8)], [137, 80, 78, 71, 13, 10, 26, 10], "PNG-подпись");
+    const pos = read(pr.attributes.POSITION), nor = read(pr.attributes.NORMAL), uv = read(pr.attributes.TEXCOORD_0);
+    assert.equal(uv.length, 8);
+    const P = [0, 1, 2, 3].map((i) => [...pos.subarray(i * 3, i * 3 + 3)]);
+    // у края А: X < 0, ближе к левому краю, внутри боковины не залезает (≥ 60 мм от края)
+    for (const p of P) { assert.ok(p[0] < 0, "слева"); assert.ok(p[0] > -W / 2 + 0.06, "не на боковине"); }
+    // строка идёт вдоль ската: начало (u=0) ниже и дальше от ступени, конец (u=1) выше и ближе
+    assert.ok(P[0][2] > P[1][2] && P[0][1] < P[1][1], "снизу вверх по скату");
+    // нормаль вверх и к человеку (+Z), над настилом на 1–3 мм
+    const n = [...nor.subarray(0, 3)];
+    assert.ok(n[1] > 0.9 && n[2] > 0, `нормаль ${n}`);
+    const ply = parseGLB(glb).json.meshes.findIndex((x) => x.name.startsWith("Настил"));
+    const { parts } = triangles(glb);
+    const top = parts[ply].tris.filter((t) => t.n[1] > 0.9);
+    const d = (p) => { const [a] = top[0].P; return (p[0] - a[0]) * top[0].n[0] + (p[1] - a[1]) * top[0].n[1] + (p[2] - a[2]) * top[0].n[2]; };
+    for (const p of P) { const h = d(p) * 1000; assert.ok(h > 0.5 && h < 3, `над настилом ${h} мм`); }
+  }
+});
+
+test("GLB с надписью проходит Khronos glTF-Validator без ошибок (если установлен)", async (t) => {
+  let v;
+  try { v = (await import("gltf-validator")).default; } catch { return t.skip("gltf-validator не установлен"); }
+  const r = await v.validateBytes(ar.toGLB(build({ hl: 85, hr: 70 }), "#102C54"));
+  assert.equal(r.issues.numErrors, 0, JSON.stringify(r.issues.messages.slice(0, 3)));
+  assert.equal(r.issues.numWarnings, 0, JSON.stringify(r.issues.messages.slice(0, 3)));
 });
