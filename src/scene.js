@@ -449,23 +449,6 @@ export function createScene(container, opts) {
     old.dispose();
   }
 
-  // надпись на внешней грани боковины: прямоугольник вписан в треугольник профиля
-  function stencilFor(part, outerMax) {
-    let yo = outerMax ? -Infinity : Infinity;
-    for (const v of part.verts) yo = outerMax ? Math.max(yo, v[1]) : Math.min(yo, v[1]);
-    const pts = part.verts.filter((v) => Math.abs(v[1] - yo) < 1e-6);
-    const xs = pts.map((v) => v[0]), zs = pts.map((v) => v[2]);
-    const xmin = Math.min(...xs), X = Math.max(...xs) - xmin, gz = Math.min(...zs), H = Math.max(...zs) - gz;
-    if (!(X > 0 && H > 8)) return null;
-    const a = TEXT_ASPECT, m = Math.max(3, H * 0.11), mx = Math.max(6, X * 0.035);
-    let h = (X * (1 - m / H) - mx) / (a + X / H);
-    h = Math.min(h, H * 0.4, 64);
-    if (!(h > 5)) return null;
-    const xr = xmin + X * (1 - (m + h) / H);
-    const x0 = xmin + mx + Math.max(0, xr - a * h - xmin - mx) * 0.3;
-    return { cx: x0 + (a * h) / 2, cz: gz + m + h / 2, y: yo + (outerMax ? 0.6 : -0.6), w: a * h, h };
-  }
-
   // ---------- окружение: наклонная плита + ступень ----------
   function convexMesh(verts, faces, mat) {
     const P = verts.map((p) => V(p[0], p[1], p[2]));
@@ -653,14 +636,15 @@ export function createScene(container, opts) {
       }
       V(at[0], at[1], at[2], L.at);
     };
-    const ox = 60, oy = 34;
-    // высоты А и Б у ступени
-    seg([ox, -oy, 0], [ox, -oy, p.hl], "h", true);
-    tick([ox, -oy, 0], [0, 1, 0], 16, "h"); tick([ox, -oy, p.hl], [0, 1, 0], 16, "h");
-    tag("A", [ox, -oy - 20, p.hl + 42], fmt(p.hl), "h", "А");
-    seg([ox, W + oy, g * W], [ox, W + oy, p.hl], "h", true);
-    tick([ox, W + oy, g * W], [0, 1, 0], 16, "h"); tick([ox, W + oy, p.hl], [0, 1, 0], 16, "h");
-    tag("B", [ox, W + oy + 20, p.hl + 42], fmt(p.hr), "h", "Б");
+    // высоты А и Б — там, где их меряют: в линии примыкания к ступени (x = 0), на краях пандуса (y = 0 и y = W),
+    // от земли до верха ступени. Без выноса вперёд, чтобы картинка не сбивала с толку (Алхас, 2026-11-05).
+    const ex = 1.5, ey = 2;
+    seg([ex, -ey, -g * ey], [ex, -ey, p.hl], "h", true);
+    tick([ex, -ey, -g * ey], [1, 0, 0], 12, "h"); tick([ex, -ey, p.hl], [1, 0, 0], 12, "h");
+    tag("A", [ex + 30, -ey - 70, p.hl * 0.55], fmt(p.hl), "h", "А");
+    seg([ex, W + ey, g * (W + ey)], [ex, W + ey, p.hl], "h", true);
+    tick([ex, W + ey, g * (W + ey)], [1, 0, 0], 12, "h"); tick([ex, W + ey, p.hl], [1, 0, 0], 12, "h");
+    tag("B", [ex + 30, W + ey + 70, g * W + (p.hl - g * W) * 0.55], fmt(p.hr), "h", "Б");
     // ширина по краю ступени
     const zw = p.hl + 3, xw = -32;
     seg([xw, 0, zw], [xw, W, zw], "o", false);
@@ -748,14 +732,33 @@ export function createScene(container, opts) {
     for (const m of [...q.raw, ...q.pnt]) m.dispose();
     if (q.text) { q.text.geometry.dispose(); q.textMat.dispose(); }
   }
+  // Надпись на верхней поверхности настила (Алхас, 2026-11-05): поперёк ширины, читается от земли к порогу.
+  // Верх настила — плоскость z = c − a·x (вдоль ширины горизонтальна); точки берутся из вершин модели.
+  function plyStencil(part) {
+    const v = part.verts;                                   // [низ у порога, низ у земли, верх у земли, верх у порога] × (y=0, y=W)
+    if (!v || v.length < 8) return null;
+    const mid = (i) => [0, 1, 2].map((k) => (v[i][k] + v[i + 4][k]) / 2);
+    const back = mid(3), front = mid(2);
+    const run = front[0] - back[0], a = (back[2] - front[2]) / run;
+    if (!(run > 0 && a > 0)) return null;
+    const sN = Math.hypot(1, a), L = run * sN;               // длина верха по скату в середине ширины
+    const wy = Math.abs(v[4][1] - v[0][1]);
+    let w = Math.min(wy * 0.5, 380, L * 0.34 * TEXT_ASPECT);
+    const h = w / TEXT_ASPECT;
+    if (!(h > 6)) return null;
+    const f = 0.56, off = 0.8;                               // ближе к земле, над шероховатостью
+    const x = back[0] + run * f, z = back[2] - a * run * f;
+    return { x: x + off * a / sN, y: back[1], z: z + off / sN, w, h, a };
+  }
   function setStencil(q, part) {
     if (q.text) { q.mesh.remove(q.text); q.text.geometry.dispose(); q.textMat.dispose(); q.text = null; q.textMat = null; }
-    if (part.id !== "left" && part.id !== "right") return;
-    const s = stencilFor(part, part.id === "right");
-    if (!s) return;
+    if (part.id !== "ply") return;
+    const st0 = plyStencil(part);
+    if (!st0) return;
+    const s = { cx: st0.x, y: st0.y, cz: st0.z, w: st0.w, h: st0.h };
     q.textMat = textMat.clone();
     q.text = new T.Mesh(new T.PlaneGeometry(s.w / 1000, s.h / 1000), q.textMat);
-    q.text.rotation.y = part.id === "right" ? Math.PI / 2 : -Math.PI / 2;
+    q.text.rotation.x = Math.atan2(-1, st0.a);               // нормаль (0, 1, a)/√(1+a²), верх букв к порогу
     q.text.renderOrder = 3;
     q.text.userData.local = V(s.cx, s.y, s.cz);           // абсолютная точка, локальная считается от текущего центра
     q.textZ = s.cx / 1000;
@@ -949,7 +952,7 @@ export function createScene(container, opts) {
       if (q.text) {
         let to = paintActive() ? 1 : 0;
         if (sweep.on) to = clamp((sweep.z - q.textZ) / 0.08, 0, 1) * (paint ? 1 : 0);
-        to *= (1 - x) * (1 - b) * (1 - 0.5 * dim) * (1 - gh) * vis * (q.id === "right" ? 1 - sec : 1);
+        to *= (1 - x) * (1 - b) * (1 - 0.5 * dim) * (1 - gh) * vis * (1 - sec);
         q.text.visible = to > 0.01;
         q.textMat.opacity = to * 0.94;
       }
