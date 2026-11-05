@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<title>Примерка пандуса AR</title>
+<meta name="description" content="GoApsny: Stopgap — модель пандуса в AR в масштабе 1:1. Параметры: ?hl=85&hr=70&width=900&board=40&paint=102C54">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600&display=swap">
+<style>
+/* Токены — подмножество src/styles.css, чтобы страница работала отдельно */
+:root {
+  color-scheme: light;
+  --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Golos Text", system-ui, sans-serif;
+  --bg: #F2F2F7; --cell: #FFFFFF; --label: #000000; --label-2: #6C6C70;
+  --sep: rgba(60, 60, 67, .2); --fill: rgba(118, 118, 128, .12);
+  --tint: #EF705D; --title-ink: #16273A; --prominent: #16273A; --on-prominent: #FFFFFF; --focus: #C9452F;
+  --red-soft: rgba(255, 59, 48, .12); --orange-soft: rgba(255, 149, 0, .14);
+  --stage: radial-gradient(120% 90% at 50% 35%, #FFFFFF 0%, #ECEDF2 55%, #DADCE3 100%);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #000000; --cell: #2C2C2E; --label: #FFFFFF; --label-2: rgba(235, 235, 245, .66);
+    --sep: rgba(84, 84, 88, .6); --fill: rgba(118, 118, 128, .24);
+    --title-ink: #FFFFFF; --prominent: #EF705D; --on-prominent: #16273A; --focus: #FF8E7A;
+    --red-soft: rgba(255, 69, 58, .2); --orange-soft: rgba(255, 159, 10, .18);
+    --stage: radial-gradient(120% 90% at 50% 35%, #3A3A3C 0%, #1C1C1E 55%, #0B0B0C 100%);
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #000000; --cell: #2C2C2E; --label: #FFFFFF; --label-2: rgba(235, 235, 245, .66);
+  --sep: rgba(84, 84, 88, .6); --fill: rgba(118, 118, 128, .24);
+  --title-ink: #FFFFFF; --prominent: #EF705D; --on-prominent: #16273A; --focus: #FF8E7A;
+  --red-soft: rgba(255, 69, 58, .2); --orange-soft: rgba(255, 159, 10, .18);
+  --stage: radial-gradient(120% 90% at 50% 35%, #3A3A3C 0%, #1C1C1E 55%, #0B0B0C 100%);
+}
+html, body { margin: 0; height: 100%; background: var(--bg); color: var(--label); font: 400 16px/1.4 var(--font); }
+main { max-width: 560px; margin: 0 auto; padding: 32px 16px; }
+h1 { margin: 0 0 8px; font-size: 22px; color: var(--title-ink); }
+p { margin: 0 0 16px; color: var(--label-2); }
+.err { padding: 12px; border-radius: 12px; background: var(--red-soft); color: var(--label); }
+button.go { min-height: 54px; width: 100%; border: 0; border-radius: 14px; background: var(--prominent); color: var(--on-prominent); font: 600 17px/1 var(--font); cursor: pointer; }
+button.go:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+</style>
+</head>
+<body>
+<main id="page">
+  <h1>Примерка пандуса</h1>
+  <p id="note">Загружаем модель…</p>
+  <button type="button" class="go" id="reopen" hidden>Открыть примерку</button>
+</main>
+<noscript><p style="padding:24px">Для примерки нужен JavaScript.</p></noscript>
+<script type="module">
+import { build } from "./src/ramp.js";
+import { createAR } from "./src/ar.js";
+
+const q = new URLSearchParams(location.search);
+const num = (k) => {
+  const v = q.get(k);
+  if (v == null || v.trim() === "") return undefined;
+  const n = Number(v.trim().replace(",", "."));
+  return Number.isFinite(n) ? n : NaN;
+};
+const params = {};
+for (const k of ["hl", "hr", "width", "board", "freeWidth"]) { const v = num(k); if (v !== undefined) params[k] = v; }
+const rawPaint = (q.get("paint") || "").trim();
+const paint = !rawPaint || /^(raw|none|нет)$/i.test(rawPaint) ? null : "#" + rawPaint.replace(/^#/, "");
+
+const note = document.getElementById("note"), reopen = document.getElementById("reopen");
+const bad = Object.entries(params).filter(([, v]) => Number.isNaN(v)).map(([k]) => k);
+const ar = createAR();
+let model = null, problem = null;
+if (bad.length) problem = `Неверное число в адресе: ${bad.join(", ")}.`;
+else if (paint && !/^#[0-9a-f]{6}$/i.test(paint)) problem = `Цвет «${rawPaint}»: ожидается вид 102C54.`;
+else {
+  model = build(params);
+  const errs = model.issues.filter((i) => i.level === "error");
+  if (errs.length) problem = errs.map((i) => i.text).join(" ");
+}
+if (problem) {
+  note.className = "err"; note.textContent = problem;
+} else {
+  const p = model.params;
+  note.textContent = `А ${p.hl} мм, Б ${p.hr} мм, ширина ${p.width} мм`.replace(/\./g, ",");
+  // на своём https-адресе GLB отдаёт /api/glb (нужен Scene Viewer на Android); локально — blob
+  const src = location.protocol === "https:" ? `${location.origin}/api/glb${location.search}` : undefined;
+  const show = () => { reopen.hidden = true; ar.open(document.body, model, paint, { src, onClose: () => { reopen.hidden = false; reopen.focus(); } }); };
+  reopen.addEventListener("click", show);
+  show();
+}
+</script>
+</body>
+</html>
