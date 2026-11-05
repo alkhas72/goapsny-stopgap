@@ -1,0 +1,6 @@
+cad/
+docs/
+tests/
+scripts/
+dist/
+node_modules/
