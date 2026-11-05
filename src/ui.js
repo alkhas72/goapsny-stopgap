@@ -1,6 +1,7 @@
 import { createDrawings } from "./drawings.js";
 import { createCutlist } from "./cutlist.js";
 import { createShare } from "./share.js";
+import { createPaints } from "./paints.js";
 // Интерфейс конструктора в духе iOS: плавающее «стекло» над 3D, инспектор (компьютер) или шторка с тремя
 // положениями (телефон), сгруппированные списки, живая схема замера, чертёж боковины, рассказ «Сборка».
 // Все размеры берутся из model.dims и model.params (src/ramp.js); здесь они только выводятся и рисуются.
@@ -15,18 +16,7 @@ export function createUI(root, handlers) {
   const doc = document;
 
   // ---------- данные ----------
-  const PAINTS = [
-    { hex: "#102C54", ral: "RAL 5026", name: "Pearl Night Blue" },
-    { hex: "#D53032", ral: "RAL 3018", name: "Strawberry Red" },
-    { hex: "#A12312", ral: "RAL 3013", name: "Tomato Red" },
-    { hex: "#F39F18", ral: "RAL 1037", name: "Sun Yellow" },
-    { hex: "#F3DA0B", ral: "RAL 1021", name: "Colza Yellow" },
-    { hex: "#C35831", ral: "RAL 2013", name: "Pearl Orange" },
-    { hex: "#1C542D", ral: "RAL 6035", name: "Pearl Green" },
-    { hex: "#89AC76", ral: "RAL 6013", name: "Reed Green" },
-    { hex: "#6C6874", ral: "RAL 4012", name: "Pearl Blackberry" },
-    { hex: null, ral: "Без покраски", name: "Натуральное дерево" },
-  ];
+  const PAINTS = createPaints().list();                // палитра OSOKA — src/paints.js (одна на 3D, мастер и AR)
   const MODES = [
     { v: "assembled", t: "Собран" }, { v: "exploded", t: "Разобран" },
     { v: "xray", t: "X-Ray" }, { v: "blueprint", t: "Чертёж" },
@@ -130,6 +120,7 @@ export function createUI(root, handlers) {
     <h1 class="t-large">Пандус</h1>
     <p class="ui-tag">Приставной пандус IDLab под ваш вход: замер, расчёт 1:6, сборка</p>
     <p class="ui-sub num-tab" data-sub></p>
+    <button type="button" class="ik-entry" data-intake-open>${icon("plus")}<span>Новый замер</span></button>
   </header>
 
   <div class="ui-tools material" role="toolbar" aria-label="Инструменты модели" aria-orientation="vertical">
@@ -167,6 +158,12 @@ export function createUI(root, handlers) {
           </div>
           <div class="tiles" data-tiles></div>
         </div>
+
+        <button type="button" class="card-link card-intake" data-intake-open>
+          <span class="card-link-ico">${icon("ruler")}</span>
+          <span class="card-link-text"><span class="t-headline">Новый замер</span><span class="t-foot c2">Пошагово у входа: фото, свободная ширина, высоты А и Б, заявка на пандус</span></span>
+          ${icon("chev", "chev")}
+        </button>
 
         <section class="sec" aria-labelledby="h-measure">
           <h2 class="sec-h" id="h-measure">Замер</h2>
@@ -503,14 +500,14 @@ export function createUI(root, handlers) {
   $("[data-swatches]").addEventListener("keydown", (e) => {
     if (!["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(e.key)) return;
     e.preventDefault();
-    const all = $$(".swatch"), cur = Math.max(0, all.indexOf(doc.activeElement));
+    const all = $$("[data-swatches] .swatch"), cur = Math.max(0, all.indexOf(doc.activeElement));
     const nx = (cur + (e.key === "ArrowLeft" || e.key === "ArrowUp" ? -1 : 1) + all.length) % all.length;
     all[nx].focus(); call("onPaint", all[nx].dataset.paint || null);
   });
   function paintInfo() { return PAINTS.find((p) => (p.hex || null) === (st.paint ? st.paint.toUpperCase() : null)) || { hex: st.paint, ral: st.paint || "Без покраски", name: "" }; }
   function syncPaint() {
     const info = paintInfo();
-    $$(".swatch").forEach((b) => {
+    $$("[data-swatches] .swatch").forEach((b) => {
       const on = (b.dataset.paint || null) === (info.hex || null);
       b.setAttribute("aria-checked", on ? "true" : "false"); b.tabIndex = on ? 0 : -1;
     });
@@ -1046,6 +1043,7 @@ export function createUI(root, handlers) {
   }
   function setPaint(hex) { st.paint = hex ? String(hex).toUpperCase() : null; syncPaint(); if (st.model) $("[data-share-code]").textContent = shareCode(); }
 
+  $$("[data-intake-open]").forEach((bt) => bt.addEventListener("click", () => call("onIntake")));
   $$("[data-export]").forEach((bt) => bt.addEventListener("click", () => call("onExport", bt.dataset.export)));
   $("[data-copy-code]").addEventListener("click", async () => {
     const code = shareCode(), btn = $("[data-copy-code]");

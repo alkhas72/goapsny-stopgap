@@ -5,6 +5,7 @@ import { createUI } from "./ui.js";
 import { createDrawings } from "./drawings.js";
 import { createShare } from "./share.js";
 import { createExport } from "./export.js";
+import { createIntake } from "./intake.js";
 
 const STORE = "goapsny-stopgap:v" + PARAMS_VERSION;
 const state = { params: { ...DEFAULTS }, paint: "#102C54", selected: null };
@@ -19,18 +20,24 @@ const save = () => { try { localStorage.setItem(STORE, JSON.stringify({ params: 
 const toNum = (v) => { if (v == null || v === "") return null; const x = typeof v === "number" ? v : parseFloat(String(v).replace(",", ".")); return Number.isFinite(x) ? x : null; };
 
 let model = build(state.params);
-let scene = null, playing = false;
+let scene = null, playing = false, isoId = null;
+
+// Один путь для замеров: и конструктор, и мастер «Новый замер» меняют параметры здесь
+function onParams(patch) {
+  for (const [k, v] of Object.entries(patch)) {
+    const x = toNum(v);
+    if (k === "freeWidth") state.params.freeWidth = x;
+    else if (x != null) state.params[k] = x;
+  }
+  save(); update();
+}
+// Один путь для покраски: и конструктор, и мастер перекрашивают модель здесь
+function onPaint(hex) { state.paint = hex || null; save(); scene.setPaint(state.paint); ui.setPaint(state.paint); }
 
 const ui = createUI(document.getElementById("app"), {
-  onParams(patch) {
-    for (const [k, v] of Object.entries(patch)) {
-      const x = toNum(v);
-      if (k === "freeWidth") state.params.freeWidth = x;
-      else if (x != null) state.params[k] = x;
-    }
-    save(); update();
-  },
-  onPaint(hex) { state.paint = hex; save(); scene.setPaint(hex); ui.setPaint(hex); },
+  onParams,
+  onIntake() { intake.open(); },
+  onPaint,
   onExplode(t) { playing = false; scene.play(false); ui.setPlaying(false); scene.setExplode(t); },
   onPlay() { playing = !playing; scene.play(playing); ui.setPlaying(playing); },
   onXray(on) { scene.setXray(on); },
@@ -38,7 +45,7 @@ const ui = createUI(document.getElementById("app"), {
   onDims(on) { scene.setDims(on); },
   onLite(on) { scene.setLite(on); },
   onStep(id) { scene.setStep(id); },
-  onIsolate(id) { scene.isolate(id); },
+  onIsolate(id) { isoId = id || null; scene.isolate(id); },
   onSpin(on) { scene.setSpin(on); },
   onSection(on) { scene.setSection(on); },
   async onExport(kind) {
@@ -73,6 +80,16 @@ function update() {
 
 scene.setPaint(state.paint); ui.setPaint(state.paint);
 update();
+const intake = createIntake().mount(document.getElementById("app"), {
+  onParams,
+  onPaint,
+  getPaint: () => state.paint,
+  getModel: () => model,
+  save: (name, data) => EXP.save(name, data),
+  // сцена сжимается или расширяется: заново навести камеру на тот же вид (изоляция сохраняется)
+  onOpen() { requestAnimationFrame(() => { scene.resize(); scene.isolate(isoId); }); },
+  onClose() { requestAnimationFrame(() => { scene.resize(); scene.isolate(isoId); }); },
+});
 new ResizeObserver(() => scene.resize()).observe(ui.stageEl);
 addEventListener("hashchange", () => {
   try {
