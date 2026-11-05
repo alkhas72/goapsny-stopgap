@@ -732,23 +732,24 @@ export function createScene(container, opts) {
     for (const m of [...q.raw, ...q.pnt]) m.dispose();
     if (q.text) { q.text.geometry.dispose(); q.textMat.dispose(); }
   }
-  // Надпись на верхней поверхности настила (Алхас, 2026-11-05): поперёк ширины, читается от земли к порогу.
-  // Верх настила — плоскость z = c − a·x (вдоль ширины горизонтальна); точки берутся из вершин модели.
+  // Надпись на верхней поверхности настила (Алхас, 2026-11-05): вдоль ската снизу вверх, у левого края,
+  // если смотреть на дверь (край А). Верх настила — плоскость z = c − a·x, вдоль ширины горизонтальна.
   function plyStencil(part) {
     const v = part.verts;                                   // [низ у порога, низ у земли, верх у земли, верх у порога] × (y=0, y=W)
     if (!v || v.length < 8) return null;
-    const mid = (i) => [0, 1, 2].map((k) => (v[i][k] + v[i + 4][k]) / 2);
-    const back = mid(3), front = mid(2);
-    const run = front[0] - back[0], a = (back[2] - front[2]) / run;
-    if (!(run > 0 && a > 0)) return null;
-    const sN = Math.hypot(1, a), L = run * sN;               // длина верха по скату в середине ширины
-    const wy = Math.abs(v[4][1] - v[0][1]);
-    let w = Math.min(wy * 0.5, 380, L * 0.34 * TEXT_ASPECT);
-    const h = w / TEXT_ASPECT;
+    const y0 = v[0][1], y1 = v[4][1], wy = Math.abs(y1 - y0);
+    const back = v[3], a = (v[3][2] - v[2][2]) / (v[2][0] - v[3][0]);
+    if (!(a > 0)) return null;
+    const sN = Math.hypot(1, a);
+    const runAt = (y) => v[2][0] + (v[6][0] - v[2][0]) * (y - y0) / (y1 - y0) - back[0];
+    const margin = 70;                                      // от левого края: боковина 40 + запас
+    // длина надписи по скату и высота букв поперёк, на коротком пандусе — меньше
+    let w = Math.min(runAt(y0 + margin) * sN * 0.72, 520), h = w / TEXT_ASPECT;
+    if (h > wy * 0.16) { h = wy * 0.16; w = h * TEXT_ASPECT; }
     if (!(h > 6)) return null;
-    const f = 0.56, off = 0.8;                               // ближе к земле, над шероховатостью
-    const x = back[0] + run * f, z = back[2] - a * run * f;
-    return { x: x + off * a / sN, y: back[1], z: z + off / sN, w, h, a };
+    const y = y0 + margin + h / 2, run = runAt(y), off = 0.8;
+    const x = back[0] + run * 0.5, z = back[2] - a * run * 0.5;
+    return { x: x + off * a / sN, y, z: z + off / sN, w, h, a, sN };
   }
   function setStencil(q, part) {
     if (q.text) { q.mesh.remove(q.text); q.text.geometry.dispose(); q.textMat.dispose(); q.text = null; q.textMat = null; }
@@ -758,7 +759,10 @@ export function createScene(container, opts) {
     const s = { cx: st0.x, y: st0.y, cz: st0.z, w: st0.w, h: st0.h };
     q.textMat = textMat.clone();
     q.text = new T.Mesh(new T.PlaneGeometry(s.w / 1000, s.h / 1000), q.textMat);
-    q.text.rotation.x = Math.atan2(-1, st0.a);               // нормаль (0, 1, a)/√(1+a²), верх букв к порогу
+    {                                                        // строка вверх по скату, верх букв — к левому краю
+      const X = new T.Vector3(0, st0.a / st0.sN, -1 / st0.sN), Y = new T.Vector3(-1, 0, 0), Z = new T.Vector3().crossVectors(X, Y);
+      q.text.quaternion.setFromRotationMatrix(new T.Matrix4().makeBasis(X, Y, Z));
+    }
     q.text.renderOrder = 3;
     q.text.userData.local = V(s.cx, s.y, s.cz);           // абсолютная точка, локальная считается от текущего центра
     q.textZ = s.cx / 1000;
