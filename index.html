@@ -3,133 +3,21 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#F2F2F7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
 <title>GoApsny: Stopgap</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;600;700&family=JetBrains+Mono:wght@500;600&display=swap">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap">
 <link rel="stylesheet" href="src/styles.css">
 <script src="https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/controls/OrbitControls.js"></script>
 </head>
 <body>
 <!-- BODY:START -->
-<div class="app" id="app">
-  <main class="stage" id="stage" aria-label="3D-модель пандуса">
-    <div class="brand"><b>GoApsny: Stopgap</b><span>конструктор пандусов IDLab</span></div>
-    <div id="tags" aria-hidden="true"></div>
-    <div class="dock" role="toolbar" aria-label="Управление моделью">
-      <label class="slider" for="explode"><span>Разборка</span> <input aria-label="Разборка" id="explode" type="range" min="0" max="1" step="0.01" value="0"></label>
-      <button class="chip" id="play" type="button" aria-pressed="false">Собрать и разобрать</button>
-      <button class="chip" id="xray" type="button" aria-pressed="false">X-Ray</button>
-      <button class="chip" id="dims" type="button" aria-pressed="true">Размеры</button>
-      <button class="chip" id="lite" type="button" aria-pressed="false">Лёгкий режим</button>
-    </div>
-  </main>
-
-  <aside class="side">
-    <div class="tabs" role="tablist" aria-label="Разделы">
-      <button role="tab" id="tab-measure" aria-controls="pane-measure" aria-selected="true" type="button">Замер</button>
-      <button role="tab" id="tab-parts" aria-controls="pane-parts" aria-selected="false" type="button">Детали</button>
-      <button role="tab" id="tab-guide" aria-controls="pane-guide" aria-selected="false" type="button">Как мерить</button>
-    </div>
-
-    <section class="pane" id="pane-measure" role="tabpanel" aria-labelledby="tab-measure">
-      <div class="field">
-        <span>Свободная ширина у ступени</span>
-        <div class="num"><input id="freeWidth" inputmode="decimal" placeholder="не измерена" aria-describedby="fw-hint"><span class="unit">мм</span></div>
-        <small id="fw-hint">Обязательно. Между наличниками и другими выступами, там, где пандус встанет вплотную к ступени.</small>
-      </div>
-      <div class="field">
-        <span>Ширина пандуса</span>
-        <div class="num">
-          <button type="button" data-step="width:-10" aria-label="Меньше на 10 мм">−10</button>
-          <input id="width" inputmode="decimal"><span class="unit">мм</span>
-          <button type="button" data-step="width:10" aria-label="Больше на 10 мм">+10</button>
-        </div>
-        <button class="link-btn" id="fitWidth" type="button">Взять по свободной ширине</button>
-      </div>
-      <div class="field">
-          <span>Высота в точке А, слева</span>
-          <div class="num">
-            <button type="button" data-step="hl:-1" aria-label="Точка А меньше на 1 мм">−</button>
-            <input id="hl" inputmode="decimal"><span class="unit">мм</span>
-            <button type="button" data-step="hl:1" aria-label="Точка А больше на 1 мм">+</button>
-          </div>
-        </div>
-      <div class="field">
-          <span>Высота в точке Б, справа</span>
-          <div class="num">
-            <button type="button" data-step="hr:-1" aria-label="Точка Б меньше на 1 мм">−</button>
-            <input id="hr" inputmode="decimal"><span class="unit">мм</span>
-            <button type="button" data-step="hr:1" aria-label="Точка Б больше на 1 мм">+</button>
-          </div>
-        </div>
-      <div class="field">
-        <span>Доска боковин</span>
-        <select id="board" aria-label="Толщина доски">
-          <option value="35">35 мм</option><option value="40">40 мм</option><option value="45">45 мм</option><option value="50">50 мм</option>
-        </select>
-      </div>
-      <div class="issues" id="issues" aria-live="polite"></div>
-      <div>
-        <h2>Пандус</h2>
-        <table aria-label="Итог расчёта"><tbody id="summary"></tbody></table>
-      </div>
-      <p class="note">Уклон 1:6 по высокой стороне, фанера 18, все резы 90°, размеры в целых мм. Формула та же, по которой сделаны пандусы №1–5; сверена с моделью build123d.</p>
-    </section>
-
-    <section class="pane" id="pane-parts" role="tabpanel" aria-labelledby="tab-parts" hidden>
-      <h2>Детали этой конфигурации</h2>
-      <table aria-label="Детали">
-        <thead><tr><th>Деталь</th><th>Размеры, мм</th><th>Шт</th></tr></thead>
-        <tbody id="parts"></tbody>
-      </table>
-      <p class="note">Нажмите на строку или на деталь в модели: они подсветятся вместе. Черновик для мастерской, размеры сверить перед раскроем.</p>
-    </section>
-
-    <section class="pane" id="pane-guide" role="tabpanel" aria-labelledby="tab-guide" hidden>
-      <h2>Замер входа</h2>
-      <div class="schema" role="img" aria-label="Вид сверху: дверной проём, ступень, пандус и точки А и Б на его краях">
-        <svg viewBox="0 0 360 250" aria-hidden="true">
-          <rect style="fill:var(--line)" x="0" y="0" width="360" height="40"/>
-          <rect style="fill:var(--field)" x="105" y="0" width="150" height="40"/>
-          <rect style="fill:var(--muted)" x="92" y="28" width="13" height="18"/><rect style="fill:var(--muted)" x="255" y="28" width="13" height="18"/>
-          <text style="fill:var(--ink)" x="180" y="24" text-anchor="middle" font-size="12">дверь</text>
-          <rect style="fill:var(--panel);stroke:var(--muted)" x="20" y="40" width="320" height="34"/>
-          <text style="fill:var(--muted)" x="30" y="61" font-size="11">ступень</text>
-          <rect style="stroke:var(--coral-ink)" x="110" y="74" width="140" height="120" fill="none" stroke-width="2" stroke-dasharray="6 4"/>
-          <text style="fill:var(--coral-ink)" x="180" y="140" text-anchor="middle" font-size="12">пандус</text>
-          <line style="stroke:var(--ink)" x1="105" y1="52" x2="255" y2="52"/><path style="stroke:var(--ink)" d="M105 48v8M255 48v8"/>
-          <circle style="fill:var(--navy)" cx="110" cy="74" r="7"/><text x="110" y="78" text-anchor="middle" font-size="10" fill="#fff">А</text>
-          <circle style="fill:var(--navy)" cx="250" cy="74" r="7"/><text x="250" y="78" text-anchor="middle" font-size="10" fill="#fff">Б</text>
-          <line style="stroke:var(--coral-ink)" x1="110" y1="212" x2="250" y2="212"/><path style="stroke:var(--coral-ink)" d="M110 206v12M250 206v12"/>
-          <text style="fill:var(--ink)" x="180" y="232" text-anchor="middle" font-size="12">А–Б = ширина пандуса</text>
-          <text style="fill:var(--ink)" x="268" y="56" font-size="11">свободная ширина</text>
-        </svg>
-      </div>
-      <ol class="steps">
-        <li><span>Найдите, где пандус встанет к ступени напротив двери.</span></li>
-        <li><span>Измерьте <b>свободную ширину</b> в этом месте с учётом наличников и других выступов. Пандус должен войти и встать вплотную.</span></li>
-        <li><span>Решите ширину пандуса: не больше свободной ширины.</span></li>
-        <li><span>Измерьте высоту ступени слева (А) и справа (Б). Точки ставьте на краях будущего пандуса: при ширине 90 см между ними 90 см.</span></li>
-        <li><span>Введите обе высоты и ширину как есть, без округления.</span></li>
-      </ol>
-      <div class="schema" role="img" aria-label="Почему нельзя мерить на узкой базе: на 40 см разница высот выходит меньше, чем на 90 см">
-        <svg viewBox="0 0 360 150" aria-hidden="true">
-          <line style="stroke:var(--muted)" x1="20" y1="110" x2="340" y2="80" stroke-width="2"/>
-          <text style="fill:var(--muted)" x="22" y="128" font-size="11">земля с уклоном</text>
-          <line style="stroke:var(--ink)" x1="20" y1="40" x2="340" y2="40" stroke-width="2"/>
-          <text style="fill:var(--muted)" x="22" y="32" font-size="11">ступень ровная</text>
-          <line style="stroke:var(--navy)" x1="40" y1="40" x2="40" y2="108" stroke-width="3"/><line style="stroke:var(--navy)" x1="320" y1="40" x2="320" y2="82" stroke-width="3"/>
-          <text style="fill:var(--ink)" x="48" y="80" font-size="12">А</text><text style="fill:var(--ink)" x="300" y="66" font-size="12">Б</text>
-          <line style="stroke:var(--coral-ink)" x1="130" y1="40" x2="130" y2="100" stroke-width="2" stroke-dasharray="4 3"/>
-          <line style="stroke:var(--coral-ink)" x1="230" y1="40" x2="230" y2="90" stroke-width="2" stroke-dasharray="4 3"/>
-          <text style="fill:var(--coral-ink)" x="180" y="142" text-anchor="middle" font-size="11">на 30–50 см разница меньше настоящей</text>
-        </svg>
-      </div>
-      <p class="note">Если земля под пандусом наклонена, замер на узкой базе 30–50 см занижает разницу высот, и пандус встанет с перекосом. Двух высот у краёв для этой конструкции достаточно.</p>
-    </section>
-  </aside>
-</div>
+<div id="app" class="app"></div>
+<noscript><p style="padding:24px;font:17px/1.4 -apple-system,system-ui,sans-serif">Конструктору пандусов нужен JavaScript.</p></noscript>
 <!-- BODY:END -->
 <script type="module" src="src/app.js"></script>
 </body>

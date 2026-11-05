@@ -4,11 +4,11 @@ import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 const read = (p) => readFileSync(new URL("../" + p, import.meta.url), "utf8");
 const html = read("index.html");
 const body = html.split("<!-- BODY:START -->")[1].split("<!-- BODY:END -->")[0];
-const ramp = read("src/ramp.js").replace(/^export /gm, "");
-const app = read("src/app.js").replace(/^import .*$/m, "");
+const strip = (src) => src.replace(/^import .*$/gm, "").replace(/^export /gm, "");
+const code = ["src/ramp.js", "src/drawings.js", "src/cutlist.js", "src/share.js", "src/export.js", "src/scene.js", "src/ui.js", "src/app.js"].map((f) => `// ---- ${f}\n` + strip(read(f))).join("\n");
 const out = `<title>GoApsny: Stopgap</title>
 <meta name="claude:viewport-fit-sides" content="cover">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;600;700&family=JetBrains+Mono:wght@500;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap">
 <style>
 ${read("src/styles.css")}
 </style>
@@ -16,8 +16,7 @@ ${read("src/styles.css")}
 <script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/controls/OrbitControls.js"></script>
 ${body}
 <script type="module">
-${ramp}
-${app}
+${code}
 </script>
 `;
 mkdirSync(new URL("../dist/", import.meta.url), { recursive: true });
