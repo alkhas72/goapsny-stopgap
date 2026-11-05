@@ -40,3 +40,8 @@ test("без свободной ширины замер неполный", () =>
   assert.ok(build({ hl: 85, hr: 70 }).issues.some((i) => i.text.startsWith("Замер неполный")));
   assert.ok(build({ hl: 85, hr: 70, freeWidth: 845 }).issues.some((i) => i.level === "error"));
 });
+
+test("ширина не больше двух боковин — ошибка, ничего не округляется", () => {
+  for (const width of [0, -100, 80]) assert.ok(build({ hl: 85, hr: 70, width, freeWidth: 950 }).issues.some((i) => i.level === "error" && i.text.startsWith("Ширина пандуса")));
+  assert.ok(!build({ hl: 85, hr: 70, width: 81, freeWidth: 950 }).issues.some((i) => i.text.startsWith("Ширина пандуса")));
+});

@@ -20,12 +20,14 @@ export function pyRound(x, nd = 0) {
 export const DEFAULTS = { hl: 85, hr: 70, width: 900, board: 40, freeWidth: null };
 
 // Проверка замера: ничего не округляет, только сообщает
+const ru = (v) => String(v).replace(".", ",");
 export function validate(p) {
   const issues = [];
+  if (!(p.width > 2 * p.board)) issues.push({ level: "error", text: `Ширина пандуса должна быть больше двух боковин (2 × ${ru(p.board)} мм).` });
   if (!(p.hl > PLY) || !(p.hr > PLY)) issues.push({ level: "error", text: `Высота порога должна быть больше ${PLY} мм (толщина фанеры).` });
   if (Math.max(p.hl, p.hr) > MAX_H) issues.push({ level: "error", text: `Ступень выше ${MAX_H / 10} см: это другое изделие.` });
   if (p.freeWidth == null || !(p.freeWidth > 0)) issues.push({ level: "warn", text: "Замер неполный: не указана свободная ширина в месте примыкания." });
-  else if (p.width > p.freeWidth) issues.push({ level: "error", text: `Пандус ${p.width} мм шире свободного места ${p.freeWidth} мм: он не встанет вплотную к ступени.` });
+  else if (p.width > p.freeWidth) issues.push({ level: "error", text: `Пандус ${ru(p.width)} мм шире свободного места ${ru(p.freeWidth)} мм: он не встанет вплотную к ступени.` });
   if (p.board < 35 || p.board > 50) issues.push({ level: "warn", text: "Толщина доски вне 35–50 мм." });
   return issues;
 }

@@ -265,9 +265,10 @@ export function createDrawings() {
     return { at, w, h: y - g };
   }
 
+  const ru = (v) => (typeof v === "number" ? String(+v.toFixed(4)) : String(v)).replace(".", ",");
   function titleText(model) {
     const p = model.params || {};
-    return `Пандус А ${p.hl} / Б ${p.hr}`;
+    return `Пандус А ${ru(p.hl)} / Б ${ru(p.hr)}`;
   }
 
   function a4(model, opts) {
@@ -293,11 +294,11 @@ export function createDrawings() {
     const L = (a, b, c, e, w = 0.35) => `<line x1="${f(a)}" y1="${f(b)}" x2="${f(c)}" y2="${f(e)}" stroke="#000" stroke-width="${w}"/>`;
     const T = (x, yy, s, size, extra = "") => `<text x="${f(x)}" y="${f(yy)}" font-size="${f(size)}"${extra}>${esc(s)}</text>`;
     const skew = model.kind === "skew";
-    const line2 = `ширина ${d.ply.width} · уклон 1:6 · фанера 18 · доска ${p.board ?? 40}`;
+    const line2 = `ширина ${ru(d.ply.width)} · уклон 1:6 · фанера 18 · доска ${ru(p.board ?? 40)}`;
     const line3 = skew
-      ? `порог разный: земля скошена на ${Math.abs(p.hl - p.hr)} мм; наклон фанеры ${d.slope}`
-      : `порог ровный; наклон фанеры ${d.slope}`;
-    const line4 = `длина пандуса ${d.totalLen}; размеры в мм; все резы 90°` + (d.rib ? "; с ребром" : "; без ребра");
+      ? `порог разный: земля скошена на ${ru(Math.abs(p.hl - p.hr))} мм; наклон фанеры ${ru(d.slope)}`
+      : `порог ровный; наклон фанеры ${ru(d.slope)}`;
+    const line4 = `длина пандуса ${d.totalLen}; размеры в мм; резы 90°, кроме верха заднего борта` + (d.rib ? "; с ребром" : "; без ребра");
     let tb = `<rect x="${x0}" y="${M}" width="${PW - 2 * M}" height="${PH - 2 * M}" fill="none" stroke="#000" stroke-width="0.5"/>`;
     tb += L(x0, ty, x1, ty, 0.5) + L(cx, ty, cx, ty1) + L(cx2, ty, cx2, ty + 11.3) + L(cx, ty + 11.3, x1, ty + 11.3) + L(cx, ty1 - 11.3, x1, ty1 - 11.3);
     tb += T(x0 + 3, ty + 8.5, titleText(model), 6.2, ' font-weight="700"');

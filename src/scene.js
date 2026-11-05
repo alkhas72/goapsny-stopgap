@@ -15,7 +15,7 @@ export function createScene(container, opts) {
   const hash = (str) => { let h = 2166136261; for (let i = 0; i < str.length; i++) h = Math.imul(h ^ str.charCodeAt(i), 16777619); return h >>> 0; };
   const mkCanvas = (w, h) => { const c = document.createElement("canvas"); c.width = w; c.height = h; return c; };
   const lin = (h) => new T.Color(h).convertSRGBToLinear();   // r147: цвета материалов задаём в линейном пространстве
-  const fmt = (v) => (Math.round(v * 10) / 10).toString().replace(".", ",");
+  const fmt = (v) => String(+(+v).toFixed(4)).replace(".", ",");   // как введено, без округления (ТЗ п. 3)
   const mq = window.matchMedia ? window.matchMedia("(prefers-reduced-motion: reduce)") : null;
   let reduce = !!(mq && mq.matches);
   if (mq && mq.addEventListener) mq.addEventListener("change", (e) => { reduce = e.matches; });

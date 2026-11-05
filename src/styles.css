@@ -689,9 +689,12 @@ g[data-part] { cursor: pointer; }
 .export-note:empty { display: none; }
 .export-note:not(:empty) { padding-bottom: 10px; }
 .cut-prev { padding: 12px; }
-.cut-sheet { fill: var(--drw-ply); stroke: var(--label-3); stroke-width: 4; }
+.cut-sheet { fill: var(--fill); stroke: var(--label-3); stroke-width: 4; }
 .cut-part { fill: var(--tint-soft); stroke: var(--tint-ink); stroke-width: 5; stroke-linejoin: round; }
 .cut-t { fill: var(--label); font: 600 64px var(--font); font-variant-numeric: tabular-nums; }
 .share-code { font: 500 14px/1.2 "JetBrains Mono", ui-monospace, monospace; color: var(--label); user-select: all; -webkit-user-select: all; word-break: break-all; text-align: right; max-width: 55%; }
 .row-btns .btn-plain, .row-btns .btn-filled { flex: 1; white-space: nowrap; padding: 0 12px; font-size: 16px; }
-.cut-sheet { fill: var(--fill); }
+.sheet-prev g.part polygon, .sheet-prev g.part path { pointer-events: all; }
+/* в «Сборке» шагами управляет рассказ: проигрыватель разборки скрыт */
+.is-story .ui-capsule { visibility: hidden; }
+.no-3d .ui-capsule { visibility: hidden; }

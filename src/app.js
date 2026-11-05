@@ -74,3 +74,12 @@ function update() {
 scene.setPaint(state.paint); ui.setPaint(state.paint);
 update();
 new ResizeObserver(() => scene.resize()).observe(ui.stageEl);
+addEventListener("hashchange", () => {
+  try {
+    const hn = (location.hash || "").replace(/^#/, "");
+    if (!/^s\d+-/.test(hn)) return;
+    const { params } = SHARE.decode(hn); const { paint, ...rest } = params;
+    state.params = { ...DEFAULTS, ...rest }; state.paint = paint;
+    save(); scene.setPaint(paint); ui.setPaint(paint); update();
+  } catch {}
+});

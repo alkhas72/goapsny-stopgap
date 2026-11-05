@@ -44,6 +44,7 @@ export function createUI(root, handlers) {
   const parse = (s) => {                                 // ввод: запятая или точка, без округления
     const t = String(s).trim().replace(/\s+/g, "").replace(",", ".");
     if (t === "") return null;
+    if (!/^-?\d+(\.\d*)?$/.test(t)) return undefined;
     const x = Number(t.replace(/[.]$/, ""));
     return Number.isFinite(x) ? x : undefined;
   };
@@ -194,7 +195,7 @@ export function createUI(root, handlers) {
         <section class="sec" aria-labelledby="h-ramp">
           <h2 class="sec-h" id="h-ramp">Пандус</h2>
           <div class="group" data-summary></div>
-          <p class="sec-f">Уклон 1:6 по высокой стороне, фанера 18, все резы 90°, размеры целыми мм.</p>
+          <p class="sec-f">Уклон 1:6 по высокой стороне, фанера 18, резы 90° (верх заднего борта скашивается под уклон), размеры целыми мм.</p>
         </section>
 
         <section class="sec" aria-labelledby="h-parts">
@@ -272,8 +273,8 @@ export function createUI(root, handlers) {
           <h2 class="sec-h" id="h-made">Как это сделано</h2>
           <div class="group">
             <div class="row row-info">${icon("hammer", "info-ico")}<span>Формула из расчёта пандусов №1–5, тех, что уже сделаны в мастерской.</span></div>
-            <div class="row row-info">${icon("ok", "info-ico info-ok")}<span>Сверена с CAD-движком build123d: 13 проверок.</span></div>
-            <div class="row row-info">${icon("ruler", "info-ico")}<span>Размеры деталей целыми мм, все резы 90°.</span></div>
+            <div class="row row-info">${icon("ok", "info-ico info-ok")}<span>Сверена с CAD-движком build123d: 11 сверок размеров и 2 проверки правил.</span></div>
+            <div class="row row-info">${icon("ruler", "info-ico")}<span>Размеры деталей целыми мм, резы 90°, скос только у верха заднего борта.</span></div>
             <div class="row row-info">${icon("cube", "info-ico")}<span>3D считается в браузере на three.js, без сервера.</span></div>
           </div>
         </section>
@@ -459,7 +460,7 @@ export function createUI(root, handlers) {
   });
   function partDims(id, d, p) {
     const sk = !!d.ply.left;
-    if (id === "ply") return sk ? `${d.ply.width} × ${d.ply.left} × 18 · у Б ${d.ply.right}` : `${d.ply.width} × ${d.ply.length} × 18`;
+    if (id === "ply") return sk ? `${num(d.ply.width)} × ${d.ply.left} × 18 · у Б ${d.ply.right}` : `${num(d.ply.width)} × ${d.ply.length} × 18`;
     if (id === "left" || id === "right") return `высота ${d[id].height} · по земле ${d[id].ground} · доска ${num(p.board)}`;
     if (id === "rear") return d.rear.bevel != null ? `${d.rear.length} × ${d.rear.left} · скос ${num(d.rear.bevel)}°` : `${d.rear.length} · высота ${d.rear.left} / ${d.rear.right}`;
     if (id === "rib" && d.rib) return `высота ${d.rib.height} · по земле ${d.rib.ground}`;
@@ -709,7 +710,7 @@ export function createUI(root, handlers) {
     } else if (id === "ply") {
       q = "Почему уклон 1:6?";
       a = "Это принятый уклон изделия: длина выходит в шесть высот порога, и пандус остаётся переносным. Настил — один лист фанеры 18 мм.";
-      r("Настил", sk ? `${d.ply.width} × ${d.ply.left} / ${d.ply.right}` : `${d.ply.width} × ${d.ply.length}`);
+      r("Настил", sk ? `${num(d.ply.width)} × ${d.ply.left} / ${d.ply.right}` : `${num(d.ply.width)} × ${d.ply.length}`);
       r("Уклон настила", slopeTxt(d.slope)); r("Общая длина", `${d.totalLen} мм`);
     } else if (id === "finish") {
       const pi = paintInfo();
@@ -746,7 +747,7 @@ export function createUI(root, handlers) {
     $("[data-main]").hidden = !!next;
     $("[data-story]").hidden = !next;
     root.classList.toggle("is-story", !!next);
-    if (mqPhone.matches && !!next !== !!was) snap(next && st.detent === "peek" ? "medium" : st.detent);
+    if (mqPhone.matches && !!next !== !!was) snap(next ? "medium" : st.detent);
     if (next) {
       renderStory();
       scroller.scrollTop = 0;
@@ -925,7 +926,7 @@ export function createUI(root, handlers) {
   function shareCode() {
     const p = st.model ? st.model.params : null;
     if (!p) return "";
-    try { return SHARE.toHashName(SHARE.encode({ ...p, paint: st.paint })); } catch { return ""; }
+    try { return SHARE.toHashName(SHARE.encode({ ...p, paint: st.paint })); } catch (e) { return "⚠ " + (e && e.message || "код не построен"); }
   }
   function cutSVG(sheet) {
     const W = sheet.size.h, H = sheet.size.w;                       // лист кладём горизонтально
@@ -973,7 +974,7 @@ export function createUI(root, handlers) {
     const diff = +(Math.abs(p.hl - p.hr)).toFixed(4);
     $("[data-sub]").textContent = sk ? `А ${num(p.hl)} · Б ${num(p.hr)} · перекос ${num(diff)} мм` : `ровный ${num(p.hl)} мм`;
     // шапка шторки
-    $("[data-head-title]").textContent = `${d.ply.width} × ${d.totalLen} мм`;
+    $("[data-head-title]").textContent = `${num(d.ply.width)} × ${d.totalLen} мм`;
     const errs = m.issues.filter((x) => x.level === "error").length, warns = m.issues.length - errs;
     const stt = errs ? ["err", "Есть ошибка в замере"] : warns ? ["warn", "Замер неполный"] : ["ok", "Замер полный"];
     const stEl = $("[data-status]");
@@ -1004,7 +1005,7 @@ export function createUI(root, handlers) {
     const ground = sk ? `А ${d.left.ground} · Б ${d.right.ground} мм` : `${d.left.ground} мм`;
     $("[data-summary]").innerHTML = [
       ["Тип", sk ? "Перекос порога" : "Ровный порог"],
-      ["Ширина", `${d.ply.width} мм`],
+      ["Ширина", `${num(d.ply.width)} мм`],
       ["Длина по земле", ground],
       ["Уклон настила", slopeTxt(d.slope)],
       ["Ребро", d.rib ? `есть · высота ${d.rib.height} мм` : "нет · порог до 200 мм"],
@@ -1049,6 +1050,7 @@ export function createUI(root, handlers) {
   $("[data-copy-code]").addEventListener("click", async () => {
     const code = shareCode(), btn = $("[data-copy-code]");
     let ok = false;
+    if (code.startsWith("⚠")) return;
     try { await navigator.clipboard.writeText(code); ok = true; } catch { ok = false; }
     btn.textContent = ok ? "Код скопирован" : "Выделите код и скопируйте вручную";
     setTimeout(() => { btn.textContent = "Скопировать код"; }, 2200);
