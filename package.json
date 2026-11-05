@@ -1,0 +1,9 @@
+{
+  "name": "goapsny-stopgap",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test tests/parity.test.mjs",
+    "build:artifact": "node scripts/build-artifact.mjs"
+  }
+}
