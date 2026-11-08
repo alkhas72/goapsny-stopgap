@@ -470,7 +470,7 @@ export function createIntake() {
     if (typeof d.extraNote !== "string") d.extraNote = "";
     d.chat = Array.isArray(d.chat) ? d.chat.filter((m) => m && m.content && !m.pending) : [];
     let saveT = 0;
-    const saveNow = () => { try { d.updatedAt = new Date().toISOString(); localStorage.setItem(DRAFT_KEY, JSON.stringify({ ...d, chat: d.chat.slice(-30).map(({ role, content, step, sug, local }) => ({ role, content, step, sug, local })) })); } catch {} };
+    const saveNow = () => { try { d.updatedAt = new Date().toISOString(); localStorage.setItem(DRAFT_KEY, JSON.stringify({ ...d, chat: d.chat.slice(-30).map(({ role, content, step, sug, local, auto }) => ({ role, content, step, sug, local, auto })) })); } catch {} };
     const save = () => { clearTimeout(saveT); saveT = setTimeout(saveNow, 250); };
 
     // ---------- снимки: память + IndexedDB ----------
