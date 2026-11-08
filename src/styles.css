@@ -962,3 +962,14 @@ button.ik-shot:disabled { opacity: .5; cursor: default; }
 .ik-fmic:active, .ik-mic:active { transform: scale(.95); }
 .ik-cap-n { margin-left: auto; align-self: center; }
 .ik-narrow { padding: 8px 20px 0; }
+
+/* Приглашение помощника над кнопками: аватар, «Помощник», подсказка шага, микрофон */
+.ik-invite-w[hidden] { display: none; }
+.ik-invite { width: 100%; display: flex; align-items: center; gap: 12px; margin: 0 0 10px; padding: 8px 8px 8px 10px; border: 0; border-radius: 18px; background: var(--tint-soft); color: var(--label); text-align: left; }
+.ik-invite .ik-ai-av { width: 36px; height: 36px; }
+.ik-invite-t { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.ik-invite-n { font-size: 15px; line-height: 20px; font-weight: 700; color: var(--tint-ink); }
+.ik-invite-s { font-size: 15px; line-height: 20px; color: var(--label); }
+.ik-invite-mic { flex: none; width: 52px; height: 52px; border-radius: 50%; display: grid; place-items: center; background: var(--tint); color: #fff; box-shadow: 0 4px 12px rgba(0,0,0,.16); }
+.ik-invite-mic .ico { width: 26px; height: 26px; }
+.ik-invite:active .ik-invite-mic { transform: scale(.95); }

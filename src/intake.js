@@ -114,7 +114,14 @@ export function createIntake() {
     },
     ai: {
       // Голос — главный способ общения (Алхас, 2026-11-08): наговорить, а не вбивать; сказанное записывается в заявку
-      name: "Голосом", aria: "Сказать голосом", open: "Сказать голосом", close: "Закрыть",
+      name: "Помощник", aria: "Помощник: голосом", open: "Сказать помощнику голосом", close: "Закрыть",
+      // приглашение на каждом шаге (Алхас, 2026-11-08: помощник явно виден и зовёт говорить голосом)
+      invite: {
+        hl: "Говорите голосом: что видите у ступени", hr: "Говорите голосом: что видите у ступени",
+        free: "Скажите, что мешает: наличник, труба, перила", overview: "Опишите вход голосом",
+        extra: "Расскажите, где ещё нужен пандус", check: "Спросите или уточните голосом",
+        fit: "Скажите, какой цвет выбрало заведение", who: "Скажите, что важно знать мастерской", send: "Добавьте голосом, что важно мастерской",
+      },
       placeholder: "Скажите или напишите",
       listen: "Слушаю…", tapMic: "Нажмите и говорите", kbd: "Нажмите микрофон на клавиатуре и говорите.",
       micOn: "Начать диктовку", micOff: "Остановить диктовку",
@@ -618,6 +625,7 @@ export function createIntake() {
           </aside>
         </div>
         <footer class="ik-foot">
+          <div class="ik-invite-w" data-ik-invite hidden></div>
           <p class="ik-reason" data-ik-reason aria-live="polite"></p>
           <div class="ik-nav" data-ik-nav></div>
         </footer>
@@ -829,6 +837,7 @@ export function createIntake() {
     }
     function renderNav() {
       const nav = $("[data-ik-nav]"), reason = $("[data-ik-reason]");
+      if (st.view !== "step") $("[data-ik-invite]").hidden = true;
       if (st.view === "resume") {
         reason.textContent = ""; reason.className = "ik-reason";
         nav.innerHTML = `<button type="button" class="btn-plain" data-ik-act="fresh">${esc(T.resume.fresh)}</button><button type="button" class="btn-filled" data-ik-act="cont"><span>${esc(T.resume.cont)}</span>${icon("chev")}</button>`;
@@ -840,11 +849,13 @@ export function createIntake() {
         return;
       }
       const id = curStep(), c = stepCheck(id, d, stepMedia(id).length), last = id === "send";
+      const inv = $("[data-ik-invite]");
+      inv.hidden = false;
+      inv.innerHTML = `<button type="button" class="ik-invite" data-ik-voice aria-label="${esc(T.ai.open)}"><span class="ik-ai-av" aria-hidden="true">${icon("spark")}</span><span class="ik-invite-t"><span class="ik-invite-n">${esc(T.ai.name)}</span><span class="ik-invite-s">${esc(T.ai.invite[id] || T.ai.tapMic)}</span></span><span class="ik-invite-mic" aria-hidden="true">${icon("mic")}</span></button>`;
       reason.textContent = c.ok ? c.warn : c.reason;
       reason.className = "ik-reason" + (c.ok ? (c.warn ? " is-warn" : "") : " is-block");
       const nextLabel = last ? (st.sending ? T.send.sending : T.send.submit) : STEPS[d.step + 1] === "send" ? T.toSend : T.next;
       nav.innerHTML = `<button type="button" class="btn-plain" data-ik-act="back" ${d.step === 0 ? "disabled" : ""}>${icon("back")}<span>${esc(T.back)}</span></button>` +
-        `<button type="button" class="ik-fmic" data-ik-voice aria-label="${esc(T.ai.open)}" title="${esc(T.ai.open)}">${icon("mic")}</button>` +
         `<button type="button" class="btn-filled" data-ik-act="${last ? "submit" : "next"}" aria-disabled="${!c.ok || st.sending}" ${st.sending ? "disabled" : ""}><span>${esc(nextLabel)}</span>${last ? "" : icon("chev")}</button>`;
       const iss = $("[data-ik-issues]");
       if (iss) iss.innerHTML = c.rule ? banner("err", c.warn || c.reason) : "";
