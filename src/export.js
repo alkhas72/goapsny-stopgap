@@ -50,7 +50,7 @@ export function createExport() {
       catch (e) { return e && e.code === "declined" ? "declined" : "unavailable"; }
     }
     try {
-      const url = URL.createObjectURL(new Blob([data]));
+      const url = URL.createObjectURL(new Blob([data], { type: /\.pdf$/i.test(filename) ? "application/pdf" : "" }));
       const a = document.createElement("a");
       a.href = url; a.download = filename; document.body.appendChild(a); a.click(); a.remove();
       setTimeout(() => URL.revokeObjectURL(url), 4000);

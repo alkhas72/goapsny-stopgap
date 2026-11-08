@@ -44,10 +44,10 @@ test("фото входа обязательно, хотя бы одно", () =>
 });
 
 test("свободная ширина: пусто — замер неполный, не число — понятная причина", () => {
-  assert.equal(I.stepCheck("free", draft()).reason, I.T.need.free);
-  assert.equal(I.stepCheck("free", draft({ free: "84 см" })).reason, I.T.need.number);
-  assert.equal(I.stepCheck("free", draft({ free: "0" })).reason, I.T.need.positive);
-  assert.equal(I.stepCheck("free", draft({ free: "845" })).ok, true);
+  assert.equal(I.stepCheck("free", draft(), 1).reason, I.T.need.free);
+  assert.equal(I.stepCheck("free", draft({ free: "84 см" }), 1).reason, I.T.need.number);
+  assert.equal(I.stepCheck("free", draft({ free: "0" }), 1).reason, I.T.need.positive);
+  assert.equal(I.stepCheck("free", draft({ free: "845" }), 1).ok, true);
 });
 
 test("ширина шире свободной блокирует шаг текстом validate()", () => {
@@ -59,12 +59,12 @@ test("ширина шире свободной блокирует шаг тек�
 });
 
 test("высоты: ≤18 блокирует, >300 пропускает с предупреждением", () => {
-  assert.equal(I.stepCheck("hl", draft()).reason, I.T.need.hl);
-  const low = I.stepCheck("hl", draft({ hl: "15" }));
+  assert.equal(I.stepCheck("hl", draft(), 1).reason, I.T.need.hl);
+  const low = I.stepCheck("hl", draft({ hl: "15" }), 1);
   assert.equal(low.ok, false); assert.match(low.reason, /больше 18 мм/);
-  const high = I.stepCheck("hr", draft({ hr: "320" }));
+  const high = I.stepCheck("hr", draft({ hr: "320" }), 1);
   assert.equal(high.ok, true); assert.match(high.warn, /выше 30 см/);
-  assert.equal(I.stepCheck("hr", draft({ hr: "70,5" })).ok, true);
+  assert.equal(I.stepCheck("hr", draft({ hr: "70,5" }), 1).ok, true);
 });
 
 test("кадры из видео: 4–6 равномерно, внутри длительности", () => {
@@ -135,7 +135,8 @@ test("поток: начатая служебная строка не показ
 test("инструкция помощнику: правила, шаг и числа есть; имени, контакта и адреса нет", () => {
   const d = draft({ name: "Аслан Тестов", contact: "+7 940 123", address: "Сухум, Мира 1", free: "845", hl: "87,5" });
   const s = I.buildPrompt(d, "hl", { images: ["1 — фото"] });
-  assert.match(s, /Шаг 5 из 8|шаг 5 из 8/i);
+  assert.match(s, /шаг 1 из 9/i);
+  assert.match(s, /голосом/);
   assert.match(s, /1:6/);
   assert.match(s, /30–50 см/);
   assert.match(s, /высота А \(слева\): 87,5 мм/);
@@ -154,8 +155,10 @@ test("черновик: новый пустой, с данными — пред�
 
 test("первый незаполненный шаг", () => {
   const ok = draft({ role: "other", name: "А", object: "Б", address: "В", free: "900", hl: "90", hr: "90" });
-  assert.equal(I.firstBlocked(ok, { overview: 1 }), I.STEPS.length);
-  assert.equal(I.firstBlocked(ok, { overview: 0 }), 1);
+  const all = { hl: 1, hr: 1, free: 1, overview: 1 };
+  assert.equal(I.firstBlocked(ok, all), I.STEPS.length);
+  assert.equal(I.firstBlocked(ok, { ...all, overview: 0 }), I.STEPS.indexOf("overview"));
+  assert.equal(I.firstBlocked(ok, { ...all, hl: 0 }), 0, "без фото высоты А дальше нельзя");
   assert.equal(I.firstBlocked(draft(), {}), 0);
 });
 
@@ -193,4 +196,32 @@ test("ссылка «Примерить в AR»: числа как введен�
   // из черновика: Б = А, если не введена; ширина по умолчанию — из расчёта; доска — из конструктора
   const d = draft({ free: "845,5", hl: "87,5" }), model = build(I.draftParams(d));
   assert.deepEqual(I.arValues(d, model), { hl: "87,5", hr: "87,5", width: "845,5", board: model.params.board });
+});
+
+// Сценарий съёмки (Алхас, 2026-11-08): минимум 4 фото — А, Б, ширина, общий план; «глубже» необязательно
+test("сценарий фото: порядок шагов, минимум 4 снимка, необязательные доп. фото", () => {
+  assert.deepEqual(I.STEPS, ["hl", "hr", "free", "overview", "extra", "check", "fit", "who", "send"]);
+  assert.deepEqual(I.PHOTO_REQUIRED, ["hl", "hr", "free", "overview"]);
+  for (const s of ["hl", "hr", "free"]) assert.equal(I.stepCheck(s, draft({ hl: "85", hr: "70", free: "900" }), 0).reason, I.T.need.photo, s);
+  assert.equal(I.stepCheck("extra", draft(), 0).ok, true, "доп. фото не обязательны");
+  assert.equal(I.stepCheck("fit", draft(), 0).ok, true, "снимок примерки не обязателен");
+  assert.ok(I.MEDIA_STEPS.includes("fit"));
+  assert.equal(I.maxPhotos("extra"), 8); assert.equal(I.maxPhotos("hl"), 3);
+  // ширина пандуса проверяется на шаге ширины: шире свободного места нельзя
+  const c = I.stepCheck("free", draft({ free: "845", width: "900" }), 1);
+  assert.equal(c.ok, false); assert.equal(c.rule, true);
+  assert.equal(I.stepCheck("free", draft({ free: "845" }), 1).ok, true);
+  const d = draft({ extraNote: "подиум 25 см" });
+  assert.equal(d.v, 2); assert.equal(d.mode, "photo");
+});
+
+test("заметки голосом попадают в заявку, автоматические вопросы к снимкам — нет", () => {
+  const d = draft({ free: "900", hl: "90", hr: "90" });
+  d.chat = [
+    { role: "user", content: "подиум у сцены двадцать пять сантиметров", step: "extra" },
+    { role: "assistant", content: "Записано в заявку.", step: "extra", local: true },
+    { role: "user", content: "Проверь снимки этого шага", step: "hl", auto: true },
+  ];
+  const req = I.buildRequest(d, build({ hl: 90, hr: 90, width: 900, freeWidth: 900 }));
+  assert.deepEqual(req.notes, [{ step: "extra", text: "подиум у сцены двадцать пять сантиметров" }]);
 });
