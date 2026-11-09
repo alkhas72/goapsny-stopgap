@@ -1069,7 +1069,8 @@ export function createUI(root, handlers) {
     setTimeout(() => root.classList.remove("intro"), 2600);
   }
   setTimeout(() => root.classList.add("intro-done"), 7000);
-  root.addEventListener("pointerdown", () => root.classList.add("intro-done"), { once: true });
+  // после нажатия, а не на pointerdown: иначе подзаголовок исчезает до click и кнопка уезжает из-под пальца
+  root.addEventListener("click", () => root.classList.add("intro-done"), { once: true });
 
   return {
     stageEl,

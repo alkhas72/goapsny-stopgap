@@ -91,10 +91,20 @@ if (problem) {
   const qFor = (hex) => { const u = new URLSearchParams(location.search); u.set("paint", hex ? hex.replace(/^#/, "") : "raw"); return u; };
   const srcFor = location.protocol === "https:" ? (hex) => `${location.origin}/api/glb?${qFor(hex)}` : undefined;
   // цвет меняется прямо в примерке; адрес страницы запоминает его, чтобы ссылкой делиться уже в цвете
-  const onPaint = (hex) => { try { history.replaceState(null, "", `${location.pathname}?${qFor(hex)}${location.hash}`); } catch {} cur = hex; };
+  const fromIk = q.get("from") === "ik";   // открыта из мастера замера
+  const onPaint = (hex) => {
+    try { history.replaceState(null, "", `${location.pathname}?${qFor(hex)}${location.hash}`); } catch {}
+    cur = hex;
+    if (fromIk) { try { localStorage.setItem("stopgap-ar-paint", JSON.stringify({ hex: hex || null, t: Date.now() })); } catch {} }
+  };
   let cur = paint;
   const paints = createPaints().list();
-  const show = () => { reopen.hidden = true; ar.open(document.body, model, cur, { srcFor, paints, onPaint, onClose: () => { reopen.hidden = false; reopen.focus(); } }); };
+  // из мастера: «×» закрывает эту вкладку и возвращает к замеру; если браузер не дал закрыть — подсказка и кнопка
+  const onClose = () => {
+    if (fromIk) { try { window.close(); } catch {} }
+    setTimeout(() => { if (fromIk) note.textContent = "Вернитесь на вкладку с замером. Цвет уже в заявке."; reopen.hidden = false; reopen.focus(); }, 300);
+  };
+  const show = () => { reopen.hidden = true; ar.open(document.body, model, cur, { srcFor, paints, onPaint, onClose }); };
   reopen.addEventListener("click", show);
   show();
 }

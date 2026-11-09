@@ -225,3 +225,23 @@ test("заметки голосом попадают в заявку, автом
   const req = I.buildRequest(d, build({ hl: 90, hr: 90, width: 900, freeWidth: 900 }));
   assert.deepEqual(req.notes, [{ step: "extra", text: "подиум у сцены двадцать пять сантиметров" }]);
 });
+
+test("число из сказанного: одно число, сантиметры переводятся в мм, иначе null", () => {
+  assert.deepEqual(I.spokenNumber("85"), { raw: "85", value: 85 });
+  assert.deepEqual(I.spokenNumber("8,5 сантиметров"), { raw: "85", value: 85 });
+  assert.deepEqual(I.spokenNumber("высота 12 см"), { raw: "120", value: 120 });
+  assert.deepEqual(I.spokenNumber("87,5 мм"), { raw: "87,5", value: 87.5 });
+  assert.equal(I.spokenNumber("слева 85, справа 90"), null);
+  assert.equal(I.spokenNumber("восемьдесят пять"), null);
+  assert.equal(I.spokenNumber("0"), null);
+});
+
+test("заметки замерщика: без быстрых вопросов и пустых строк", () => {
+  const d = { chat: [
+    { role: "user", content: "подиум у сцены", step: "extra" },
+    { role: "user", content: "Проверь фото", step: "hl", auto: true },
+    { role: "assistant", content: "Записано", step: "extra" },
+    { role: "user", content: "  ", step: "hl" },
+  ] };
+  assert.deepEqual(I.userNotes(d), [{ step: "extra", text: "подиум у сцены" }]);
+});

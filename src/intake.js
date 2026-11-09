@@ -58,7 +58,7 @@ export function createIntake() {
     ph: {
       roleOther: "например, родственник", name: "Как к вам обращаться", contact: "+7 940 …, Telegram, почта",
       object: "Школа № 3, поликлиника…", address: "Город, улица, дом", entrance: "главный, со двора…",
-      comment: "Ступень сколота, рядом люк…", number: "как на рулетке",
+      comment: "Ступень сколота, рядом люк…", number: "0",
     },
     need: {
       role: "Выберите, кто вы.", name: "Впишите имя.", object: "Впишите учреждение или объект.", address: "Впишите адрес.",
@@ -69,6 +69,7 @@ export function createIntake() {
     media: {
       photo: "Сделать фото", video: "Снять видео", gallery: "Галерея",
       toVideo: "Снять видео вместо фото", toPhoto: "Сделать фото вместо видео",
+      zoomAria: "Снимок крупно", zoomHint: "Нажмите на снимок, чтобы увеличить",
       remove: "Удалить снимок", frame: (t) => `кадр ${t} с`, frames: "Кадры из видео",
       busyPhoto: "Обрабатываю фото…", busyVideo: "Достаю кадры из видео…",
       maxPhotos: (n) => `Не больше ${n} фото на шаг. Удалите лишнее, чтобы добавить новое.`,
@@ -92,11 +93,12 @@ export function createIntake() {
       see3dPhone: "3D-модель вверху показывает этот пандус.", see3dDesk: "3D-модель рядом показывает этот пандус.",
     },
     send: {
-      who: "Кто меряет", obj: "Объект", measure: "Замер", edit: "Изменить", photos: "Снимков",
+      who: "Кто меряет", obj: "Объект", measure: "Замер", notes: "Заметки", edit: "Изменить", photos: "Снимков",
       submit: "Отправить заявку", sending: "Отправляю…",
       okTitle: "Заявка отправлена", okText: (id) => `Номер заявки: ${id}.`,
       photosSaved: (n, m) => `Снимков сохранено с заявкой: ${n} из ${m}.`,
       photosLocal: "Снимки не поместились в хранилище: они есть в файле заявки.",
+      readyTitle: "Заявка готова", readyText: (id) => `Номер: ${id}. Скачайте PDF и отправьте его в мастерскую.`,
       localTitle: "Заявка сохранена на этом устройстве",
       localText: (id) => `Номер: ${id}. Скачайте файл заявки и передайте его в АИС.`,
       why: { nodb: "Хранилище заявок здесь недоступно.", noid: "Не удалось узнать вашу учётную запись: войдите в Claude, чтобы отправлять заявки.", timeout: "Хранилище не ответило за 10 секунд.", error: "Хранилище отклонило заявку." },
@@ -191,10 +193,28 @@ export function createIntake() {
   const DOC_LIMIT = 256 * 1024;
   const DB_MAX_PHOTOS = 20;
   const PHOTO_DOC_MAX = 180000;                // символов data URL на одну фото-запись (с запасом от 256 KiB)
-  const AR_BASE = "https://goapsny-stopgap.vercel.app";   // страница AR с собственным выбором цвета
+  const AR_BASE = "https://goapsny-stopgap.vercel.app";
+  const AR_PAINT_KEY = "stopgap-ar-paint";   // примерка → мастер: последний выбранный цвет   // страница AR с собственным выбором цвета
   const DB_PHOTO_PLAN = [{ max: 800, q: 0.7 }, { max: 800, q: 0.55 }, { max: 640, q: 0.5 }, { max: 480, q: 0.45 }];
 
   // ---------- чистые функции ----------
+  // Заметки замерщика: всё, что он сказал или написал помощнику, кроме быстрых вопросов-кнопок
+  function userNotes(d) {
+    return (d.chat || []).filter((m) => m.role === "user" && !m.auto && String(m.content || "").trim()).slice(-40).map((m) => ({ step: m.step, text: clip(m.content, 1000) }));
+  }
+  // Число из сказанного: «85», «8,5 сантиметров», «85 мм» → мм. Без единиц — как на рулетке, в мм.
+  // Ровно одно число, иначе null (не угадываем). Возвращает { raw, value }.
+  function spokenNumber(text) {
+    const s = String(text || "").toLowerCase();
+    const all = [...s.matchAll(/(\d+(?:[.,]\d+)?)\s*(мм|миллиметр[а-я]*|см|сантиметр[а-я]*)?/g)];
+    if (all.length !== 1) return null;
+    let v = Number(all[0][1].replace(",", ".")); const u = all[0][2] || "";
+    if (!Number.isFinite(v)) return null;
+    if (u.startsWith("с")) v = v * 10;
+    v = +v.toFixed(1);
+    if (!(v > 0 && v <= 5000)) return null;
+    return { raw: String(v).replace(".", ","), value: v };
+  }
   // Ввод: запятая или точка, без округления. null — пусто, undefined — не число.
   function parseNum(s) {
     const t = String(s ?? "").trim().replace(/\s+/g, "").replace(",", ".");
@@ -321,7 +341,7 @@ export function createIntake() {
       comment: clip(d.comment, 4000),
       extra: { note: clip(d.extraNote, 2000) },
       // сказанное голосом или написанное в окне «Голосом» (без автоматических вопросов к снимкам)
-      notes: (d.chat || []).filter((m) => m.role === "user" && !m.auto && String(m.content || "").trim()).slice(-40).map((m) => ({ step: m.step, text: clip(m.content, 1000) })),
+      notes: userNotes(d),
       photos: photos.map((x) => ({ step: x.step, kind: x.kind, ...(x.t != null ? { t: x.t } : {}) })),
       photoCount: photos.length, photosStored: 0,
     };
@@ -623,6 +643,11 @@ export function createIntake() {
             </form>
             <div class="ik-micbar"><button type="button" class="ik-mic" data-ik-mic aria-pressed="false" aria-label="${esc(T.ai.micOn)}">${icon("mic")}</button><p class="ik-mic-s" data-ik-mic-s aria-live="polite"></p></div>
           </aside>
+          <div class="ik-zoom" data-ik-zoom role="dialog" aria-label="${esc(T.media.zoomAria)}" hidden>
+            <button type="button" class="ik-ai-x ik-zoom-x" data-ik-zoom-close aria-label="${esc(T.ai.close)}">${icon("close")}</button>
+            <div class="ik-zoom-sc" data-ik-zoom-sc><img data-ik-zoom-img alt=""></div>
+            <p class="ik-zoom-h">${esc(T.media.zoomHint)}</p>
+          </div>
         </div>
         <footer class="ik-foot">
           <div class="ik-invite-w" data-ik-invite hidden></div>
@@ -727,13 +752,13 @@ export function createIntake() {
       const S = T.steps[step], photos = stepMedia(step), max = maxPhotos(step), last = photos[photos.length - 1];
       const busy = st.capBusy ? "disabled" : "", full = photos.length >= max ? "disabled" : "";
       const k0 = S.gallery ? "photo-g" : "photo";   // примерка — снимок экрана из галереи
-      const th = (m) => `<div class="ik-th"><img src="${m.url}" alt="${esc(S.media)}"><button type="button" class="ik-th-x" data-ik-rm="${m.id}" aria-label="${esc(T.media.remove)}">${icon("close")}</button></div>`;
+      const th = (m) => `<div class="ik-th"><img src="${m.url}" alt="${esc(S.media)}" data-ik-zoom-open="${m.id}"><button type="button" class="ik-th-x" data-ik-rm="${m.id}" aria-label="${esc(T.media.remove)}">${icon("close")}</button></div>`;
       const shot = last
-        ? `<div class="ik-shot ik-shot-has"><img src="${last.url}" alt="${esc(S.media)}"></div>`
+        ? `<button type="button" class="ik-shot ik-shot-has" data-ik-zoom-open="${last.id}" aria-label="${esc(T.media.zoomAria)}"><img src="${last.url}" alt="${esc(S.media)}"></button>`
         : `<button type="button" class="ik-shot" data-ik-cap="${k0}" ${busy}><span class="ik-shot-ico" aria-hidden="true">${icon(S.gallery ? "gallery" : "camera")}</span><span class="ik-shot-t">${esc(S.shot || S.media)}</span></button>`;
       return `<div class="group group-gap ik-media" data-ik-media="${step}">
         ${shot}
-        ${photos.length ? `<div class="ik-thumbs">${photos.map(th).join("")}</div>` : ""}
+        ${photos.length > 1 ? `<div class="ik-thumbs">${photos.map(th).join("")}</div>` : ""}
         ${st.capBusy ? `<p class="ik-cap-busy" role="status"><span class="ik-spin" aria-hidden="true"></span>${esc(st.capBusy)}</p>` : ""}
         ${st.capMsg ? `<div class="banner banner-warn banner-in" role="alert">${icon("warn", "b-ico")}<span>${esc(st.capMsg)}</span></div>` : ""}
         ${photos.length ? `<div class="ik-cap-row">
@@ -809,6 +834,10 @@ export function createIntake() {
         grp(S.obj, "who", [[T.fields.object, d.object.trim()], [T.fields.address, d.address.trim()], [T.fields.entrance, d.entrance.trim()]]) +
         grp(T.paint.row, "fit", [[T.paint.row, (() => { const r = paintRecord(curPaint(), paints); return r.hex ? [r.ral, r.name].filter(Boolean).join(" · ") : T.paint.rawName; })()]]) +
         grp(S.measure, "free", [[T.steps.free.label, v.freeWidth != null ? `${d.free.trim()} мм` : ""], [T.steps.width.label, v.width != null ? `${num(v.width)} мм` : ""], [T.steps.hl.label, v.hl != null ? `${d.hl.trim()} мм` : ""], [T.steps.hr.label, v.hr != null ? `${d.hr.trim()} мм` : ""], [S.photos, String(all.length)]]) +
+        (() => {
+          const ns = userNotes(d);
+          return ns.length ? `<div class="ik-sum-h"><span>${esc(S.notes)}</span></div><div class="group">${ns.map((n) => `<div class="row row-kv"><span>${esc(T.steps[n.step]?.short || "")}</span><span class="kv-v c2">${esc(n.text)}</span></div>`).join("")}</div>` : "";
+        })() +
         `<div class="group group-gap"><label class="ik-text"><span class="ik-text-l">${esc(T.fields.comment)}</span><textarea data-f="comment" rows="2" placeholder="${esc(T.ph.comment)}">${esc(d.comment)}</textarea></label></div>` +
         `<p class="ik-send-note" data-ik-send-note role="status">${esc(st.sendNote)}</p>`;
     }
@@ -817,9 +846,11 @@ export function createIntake() {
     }
     function doneHTML() {
       const s = d.sent, S = T.send, ok = s.stored === "db";
-      let o = `<div class="ik-done ${ok ? "ik-done-ok" : "ik-done-local"}">${icon(ok ? "ok" : "warn", "ik-done-ico")}<h2 class="ik-title" tabindex="-1" data-ik-h>${esc(ok ? S.okTitle : S.localTitle)}</h2>` +
-        `<p class="ik-lead">${esc(ok ? S.okText(s.id) : S.localText(s.id))}</p>`;
-      if (!ok && s.reason) o += `<p class="ik-lead c2">${esc(S.why[s.reason] || S.why.error)}</p>`;
+      // без хранилища (сайт, не claude.ai) это обычный путь: итог — PDF, тревоги нет
+      const ready = !ok && s.reason === "nodb", fine = ok || ready;
+      let o = `<div class="ik-done ${fine ? "ik-done-ok" : "ik-done-local"}">${icon(fine ? "ok" : "warn", "ik-done-ico")}<h2 class="ik-title" tabindex="-1" data-ik-h>${esc(ok ? S.okTitle : ready ? S.readyTitle : S.localTitle)}</h2>` +
+        `<p class="ik-lead">${esc(ok ? S.okText(s.id) : ready ? S.readyText(s.id) : S.localText(s.id))}</p>`;
+      if (!fine && s.reason) o += `<p class="ik-lead c2">${esc(S.why[s.reason] || S.why.error)}</p>`;
       if (ok && s.photoCount && s.photosStored < s.photoCount) o += `<p class="ik-lead c2">${esc(s.photosStored ? S.photosSaved(s.photosStored, s.photoCount) : S.photosLocal)}</p>`;
       o += `</div><div class="group group-gap"><button type="button" class="row row-action ik-dl" data-ik-dl>${icon("download")}<span>${esc(S.download)}</span></button></div>` +
         `<p class="ik-send-note" data-ik-dl-note role="status"></p>`;
@@ -912,7 +943,7 @@ export function createIntake() {
       rec.onerror = (e) => { if (["not-allowed", "service-not-allowed", "audio-capture"].includes(e && e.error)) st.micErr = true; };
       rec.onend = () => {
         st.listening = false; rec = null; renderAI();
-        if (fin.trim() && st.aiOpen && !st.busy) $("[data-ik-form]").requestSubmit();
+        if (fin.trim() && !st.busy) $("[data-ik-form]").requestSubmit();
         else if (st.aiOpen) qEl.focus({ preventScroll: true });
       };
       st.listening = true; renderAI();
@@ -923,8 +954,19 @@ export function createIntake() {
       st.aiOpen = true; renderAI(); renderLog();
       if (!st.micErr) micStart(); else requestAnimationFrame(() => qEl.focus({ preventScroll: true }));
     }
+    // Снимок крупно: по нажатию — во весь экран, второе нажатие — в полный размер с прокруткой (проверить деления рулетки)
+    function openZoom(id) {
+      const m = MEDIA_STEPS.flatMap(stepMedia).find((x) => x.id === id); if (!m) return;
+      const z = $("[data-ik-zoom]"), img = $("[data-ik-zoom-img]");
+      img.src = m.url; z.classList.remove("is-full"); z.hidden = false;
+      $("[data-ik-zoom-close]").focus({ preventScroll: true });
+    }
+    function closeZoom() { const z = $("[data-ik-zoom]"); z.hidden = true; $("[data-ik-zoom-img]").removeAttribute("src"); }
     function closeVoice() {
-      try { rec?.abort(); } catch {}
+      // сказанное не теряем: распознавание доводим до конца (stop, не abort), набранное сохраняем в заметки
+      const pending = !st.listening && !st.busy && qEl.value.trim();
+      if (st.listening) { try { rec?.stop(); } catch {} }
+      if (pending) $("[data-ik-form]").requestSubmit();
       st.listening = false; st.aiOpen = false; renderAI();
       requestAnimationFrame(() => $("[data-ik-voice]")?.focus({ preventScroll: true }));
     }
@@ -978,7 +1020,13 @@ export function createIntake() {
     async function ask(question, opt = {}) {
       const id = st.view === "done" ? "send" : curStep();
       if (st.busy || !question.trim()) return;
-      if (!st.sample) { pushMsg({ role: "user", content: question, step: id }); pushMsg({ role: "assistant", content: T.ai.saved, step: id, local: true }); renderAI(); return; }
+      if (!st.sample) {
+        // без ИИ: сказанное — заметка; если в нём одно число на шаге с полем, предлагаем взять его в поле
+        pushMsg({ role: "user", content: question, step: id, ...(opt.auto ? { auto: true } : {}) });
+        const key = { hl: "hl", hr: "hr", free: "freeWidth" }[id], n = key ? spokenNumber(question) : null;
+        pushMsg({ role: "assistant", content: T.ai.saved, step: id, local: true, ...(n ? { sug: [{ key, raw: n.raw, value: n.value }] } : {}) });
+        renderAI(); return;
+      }
       let list = [];
       if (opt.media && st.imagesOK) {
         const all = stepMedia(id);
@@ -1074,7 +1122,12 @@ export function createIntake() {
         }
       }
       st.capBusy = ""; saveNow();
-      if (curStep() === id && st.view === "step") renderMedia();
+      if (curStep() === id && st.view === "step") {
+        renderMedia();
+        // после снимка — к полю числа: на маленьком экране оно иначе под подвалом (кросс-аудит 09.11, К-2)
+        const f = { hl: "hl", hr: "hr", free: "free" }[id], inp = f && added ? $(`input[data-f="${f}"]`, body) : null;
+        if (inp) requestAnimationFrame(() => inp.scrollIntoView({ block: "center", behavior: "smooth" }));
+      }
       renderAI();
       if (fromAi && added && st.sample) quick("check");
     }
@@ -1129,7 +1182,9 @@ export function createIntake() {
       st.view = "done"; render(true);
     }
     function openAR() {
-      const url = d.sent?.ar || arUrl(arValues(d, getModel()), curPaint());
+      // from=ik: примерка знает, что её открыл мастер — по «×» закрывает свою вкладку и возвращает выбранный цвет
+      const base = d.sent?.ar || arUrl(arValues(d, getModel()), curPaint());
+      const url = /[?&]from=ik\b/.test(base) ? base : `${base}&from=ik`;
       let w = null;
       try { w = window.open(url, "_blank"); } catch { w = null; }
       const note = $("[data-ik-ar-note]");
@@ -1200,6 +1255,8 @@ export function createIntake() {
     // ---------- события ----------
     box.addEventListener("click", async (e) => {
       const t = e.target;
+      if (t.matches?.("img[data-ik-zoom-open]")) return openZoom(t.dataset.ikZoomOpen);
+      if (t.matches?.("[data-ik-zoom-img]")) { $("[data-ik-zoom]").classList.toggle("is-full"); return; }
       const b = t.closest("button"); if (!b || b.disabled) return;
       if (b.matches("[data-ik-close]")) return close();
       if (b.dataset.ikAct) {
@@ -1219,6 +1276,8 @@ export function createIntake() {
       if (b.dataset.ikCap) return pick(b.dataset.ikCap, false);
       if (b.matches("[data-ik-voice]")) return openVoice();
       if (b.matches("[data-ik-ai-close]")) return closeVoice();
+      if (b.dataset.ikZoomOpen) return openZoom(b.dataset.ikZoomOpen);
+      if (b.matches("[data-ik-zoom-close]")) return closeZoom();
       if (b.matches("[data-ik-mic]")) return st.listening ? micStop() : micStart();
       if (b.dataset.ikRm) { removeMedia(b.dataset.ikRm); saveNow(); renderMedia(); return; }
       if (b.dataset.ikQuickK) return quick(b.dataset.ikQuickK);
@@ -1262,10 +1321,16 @@ export function createIntake() {
       if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); $("[data-ik-form]").requestSubmit(); }
     });
     qEl.addEventListener("input", growQ);
+    // цвет, выбранный в примерке (вкладка /ar того же сайта), возвращается в мастер и в заявку
+    addEventListener("storage", (e) => {
+      if (e.key !== AR_PAINT_KEY || !e.newValue || !st.open) return;
+      try { const v = JSON.parse(e.newValue); if (v && (v.hex === null || /^#[0-9a-f]{6}$/i.test(v.hex))) setPaint(v.hex); } catch {}
+    });
     doc.addEventListener("keydown", (e) => {
       if (!st.open || e.key !== "Escape" || e.defaultPrevented) return;
       e.preventDefault();
-      if (st.aiOpen) closeVoice();
+      if (!$("[data-ik-zoom]").hidden) closeZoom();
+      else if (st.aiOpen) closeVoice();
       else close();
     });
     mqWide.addEventListener?.("change", () => { if (st.open) renderAI(); });
@@ -1276,7 +1341,7 @@ export function createIntake() {
 
   return {
     T, STEPS, MEDIA_STEPS, PHOTO_REQUIRED, maxPhotos, DB_PHOTO_PLAN, PHOTO_DOC_MAX, DOC_LIMIT,
-    parseNum, fitSize, frameCount, frameTimes, defaultWidth, newId, emptyDraft, hasData, values, draftParams,
+    parseNum, spokenNumber, userNotes, fitSize, frameCount, frameTimes, defaultWidth, newId, emptyDraft, hasData, values, draftParams,
     AR_BASE, paintRecord, arUrl, arValues,
     stepCheck, firstBlocked, buildRequest, docBytes, parseSuggestions, visibleStream, buildPrompt, modelSummary, withTimeout,
     mount,
