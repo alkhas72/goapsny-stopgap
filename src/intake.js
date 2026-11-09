@@ -696,7 +696,7 @@ export function createIntake() {
           const on = (p.hex ? p.hex.toUpperCase() : null) === r.hex;
           return `<button type="button" role="radio" aria-checked="${on}" tabindex="${on ? 0 : -1}" class="swatch${p.hex ? "" : " swatch-raw"}" data-ik-paint="${p.hex || ""}" aria-label="${esc(p.ral + (p.hex ? ", " + p.name : ""))}" style="--sw:${p.hex || "transparent"}"></button>`;
         }).join("")}</div>
-      </div><p class="sec-f">${esc(P.note)} ${esc(PAINTS.STOCK_NOTE)}</p>`;
+      </div><p class="sec-f">${esc(P.note)}</p>`;
     }
     function setPaint(hex) {
       if (typeof h.onPaint === "function") h.onPaint(hex || null);
