@@ -65,7 +65,8 @@ scene = createScene(ui.stageEl, {
 });
 
 const dark = matchMedia("(prefers-color-scheme: dark)");
-const theme = () => document.documentElement.dataset.theme || (dark.matches ? "dark" : "light");
+// сиреневая оболочка (?skin=violet) светлая при любой теме системы
+const theme = () => document.documentElement.dataset.skin === "violet" ? "light" : document.documentElement.dataset.theme || (dark.matches ? "dark" : "light");
 scene.setTheme(theme());
 dark.addEventListener?.("change", () => scene.setTheme(theme()));
 new MutationObserver(() => scene.setTheme(theme())).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
@@ -100,3 +101,14 @@ addEventListener("hashchange", () => {
     save(); scene.setPaint(paint); ui.setPaint(paint); update();
   } catch {}
 });
+
+// Сиреневая оболочка (?skin=violet): круг нажатия под пальцем
+if (document.documentElement.dataset.skin === "violet" && !matchMedia("(prefers-reduced-motion: reduce)").matches) {
+  addEventListener("pointerdown", (e) => {
+    if (!e.target.closest?.("button, [role=radio], a")) return;
+    const r = document.createElement("span");
+    r.className = "v-rip"; r.style.left = e.clientX + "px"; r.style.top = e.clientY + "px";
+    document.body.appendChild(r);
+    r.addEventListener("animationend", () => r.remove());
+  }, { passive: true });
+}

@@ -116,8 +116,10 @@ export function createScene(container, opts) {
   scene.add(fill);
 
   // ---------- фон: бесшовная циклорама (экранный градиент с виньеткой, вне тонмаппинга) ----------
+  // сиреневая оболочка (?skin=violet): студия и размерные линии в её цветах
+  const VIOLET = typeof document !== "undefined" && document.documentElement.dataset.skin === "violet";
   const THEMES = {
-    light: { a: new T.Color("#FBFBFD"), b: new T.Color("#DCDCE2") },
+    light: VIOLET ? { a: new T.Color("#F1E6FD"), b: new T.Color("#C8ADE2") } : { a: new T.Color("#FBFBFD"), b: new T.Color("#DCDCE2") },
     dark: { a: new T.Color("#3A3A3F"), b: new T.Color("#121214") },
     bp: { a: new T.Color("#1552B2"), b: new T.Color("#072766") },
   };
@@ -350,8 +352,8 @@ export function createScene(container, opts) {
         gl_FragColor = vec4(0.86, 0.93, 1.0, a*uK);
       }`,
   });
-  const laserCore = new T.MeshBasicMaterial({ color: lin("#FF7A66"), transparent: true, depthTest: false, depthWrite: false, toneMapped: false });
-  const laserHalo = new T.MeshBasicMaterial({ color: lin("#EF705D"), transparent: true, opacity: 0.2, depthTest: false, depthWrite: false, toneMapped: false });
+  const laserCore = new T.MeshBasicMaterial({ color: lin(VIOLET ? "#6D3ACA" : "#FF7A66"), transparent: true, depthTest: false, depthWrite: false, toneMapped: false });
+  const laserHalo = new T.MeshBasicMaterial({ color: lin(VIOLET ? "#7F4EC5" : "#EF705D"), transparent: true, opacity: 0.2, depthTest: false, depthWrite: false, toneMapped: false });
   const unitCyl = new T.CylinderGeometry(1, 1, 1, 10, 1, false);
   const unitSph = new T.SphereGeometry(1, 14, 10);
   const textMat = new T.MeshStandardMaterial({ map: TX.stencil, transparent: true, depthWrite: false, roughness: 0.5, metalness: 0, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
@@ -621,7 +623,7 @@ export function createScene(container, opts) {
         const el = document.createElement("div");
         el.className = "gs-dim";
         const b = document.createElement("span");
-        Object.assign(b.style, { color: "#EF705D", fontWeight: "700", marginRight: "5px" });
+        Object.assign(b.style, { color: VIOLET ? "#6D3ACA" : "#EF705D", fontWeight: "700", marginRight: "5px" });
         const t = document.createTextNode("");
         el.append(b, t);
         overlay.appendChild(el);
@@ -678,7 +680,12 @@ export function createScene(container, opts) {
       boxShadow: dark || bp ? "0 6px 20px rgba(0,0,0,0.28)" : "0 1px 2px rgba(0,0,0,0.05), 0 6px 18px rgba(28,28,40,0.10)",
       backdropFilter: "blur(16px) saturate(180%)", WebkitBackdropFilter: "blur(16px) saturate(180%)",
       transition: "background-color .3s, color .3s, border-color .3s",
-    });
+    }, VIOLET && !bp ? {
+      font: `700 ${narrow ? 12 : 13}px/1.15 "Inter", -apple-system, BlinkMacSystemFont, "Golos Text", system-ui, sans-serif`,
+      color: "#1D1524", background: "#FFFFFF", border: "0",
+      boxShadow: "0 1px 2px rgba(60,30,100,0.08), 0 6px 16px rgba(74,40,130,0.16)",
+      backdropFilter: "none", WebkitBackdropFilter: "none",
+    } : null);
   }
 
   // ---------- детали: создание, плавная смена формы, удаление ----------
