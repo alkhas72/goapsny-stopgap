@@ -12,16 +12,42 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap">
 <link rel="stylesheet" href="src/styles.css">
 <link rel="stylesheet" href="src/skin-violet.css">
+<link rel="stylesheet" href="src/skin-living.css">
+<link rel="stylesheet" href="src/skin-living-intake.css">
+<link rel="stylesheet" href="src/map.css">
+<link rel="stylesheet" href="src/shell.css">
 <script>
-// Сиреневая оболочка (проба дизайна) включается только адресом ?skin=violet; без него приложение выглядит как прежде
+// Оболочка приложения. По умолчанию — «живая» (по эталону «Суфлёр АИС»): data-skin=living и одно из четырёх настроений.
+// ?skin=classic — прежний вид в духе iOS, ?skin=violet — сиреневая проба от 16.11. Расчёт и разметка у всех одни.
 (function () {
   try {
-    if (new URLSearchParams(location.search).get("skin") !== "violet") return;
-    var d = document.documentElement; d.dataset.skin = "violet"; d.dataset.theme = "light";
-    var l = document.createElement("link"); l.rel = "stylesheet";
-    l.href = "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@700&family=Playfair+Display:wght@700;800;900&display=swap";
-    document.head.appendChild(l);
-    document.querySelectorAll('meta[name="theme-color"]').forEach(function (m) { m.content = "#EFE2FC"; });
+    var d = document.documentElement, q = new URLSearchParams(location.search);
+    var ls = function (k) { try { return localStorage.getItem(k); } catch (e) { return null; } };
+    var skin = q.get("skin"); skin = skin === "violet" || skin === "classic" ? skin : "living";
+    if (skin === "classic") return;
+    d.dataset.skin = skin;
+    var tc = function (c) { document.querySelectorAll('meta[name="theme-color"]').forEach(function (m) { m.content = c; }); };
+    if (skin === "violet") {
+      d.dataset.theme = "light";
+      var l = document.createElement("link"); l.rel = "stylesheet";
+      l.href = "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@700&family=Playfair+Display:wght@700;800;900&display=swap";
+      document.head.appendChild(l);
+      tc("#EFE2FC");
+      return;
+    }
+    // настроение: мята (по умолчанию), орхидея, лайм, ночь; выбор хранится в браузере
+    var mood = ls("goapsny-stopgap:mood"); if (!/^(sage|orchid|lime|night)$/.test(mood)) mood = "sage";
+    d.dataset.mood = mood; d.dataset.theme = mood === "night" ? "dark" : "light";
+    tc({ sage: "#bedec9", orchid: "#f7cbe7", lime: "#f5f9ad", night: "#182620" }[mood]);
+    if (window.self !== window.top) {
+      // приложение внутри витрины: корпус телефона или «во весь экран» — говорит родительская страница
+      var ps = null; try { ps = window.parent.document.documentElement.dataset.shell; } catch (e) {}
+      if (ps) d.dataset.framed = ps === "full" ? "full" : "phone";
+    } else if (q.get("shell") !== "off" && matchMedia("(min-width: 541px)").matches && !matchMedia("(hover: none) and (pointer: coarse)").matches) {
+      // компьютер: витрина с корпусом телефона; на телефонах и планшетах приложение занимает экран целиком.
+      // ?shell=off открывает приложение без витрины (для проверок)
+      d.dataset.shell = ls("goapsny-stopgap:shell") === "full" ? "full" : "phone";
+    }
   } catch (e) {}
 })();
 </script>
@@ -33,6 +59,6 @@
 <div id="app" class="app"></div>
 <noscript><p style="padding:24px;font:17px/1.4 -apple-system,system-ui,sans-serif">Конструктору пандусов нужен JavaScript.</p></noscript>
 <!-- BODY:END -->
-<script type="module" src="src/app.js"></script>
+<script type="module" src="src/boot.js"></script>
 </body>
 </html>

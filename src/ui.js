@@ -14,6 +14,9 @@ export function createUI(root, handlers) {
     if (typeof h[name] === "function") h[name](...a);
   };
   const doc = document;
+  // «Живая» оболочка (data-skin=living, по эталону «Суфлёр АИС») добавляет к той же разметке свои детали:
+  // переключатель настроения, цветные капсулы разделов, капсулы полноты замера, значки в плитках. Прежние оболочки их не получают.
+  const LIVING = doc.documentElement.dataset.skin === "living";
 
   // ---------- данные ----------
   const PAINTS = createPaints().list();                // палитра OSOKA — src/paints.js (одна на 3D, мастер и AR)
@@ -66,6 +69,11 @@ export function createUI(root, handlers) {
     section: '<path d="M4 4l16 16" style="stroke:currentColor" stroke-width="1.8" stroke-linecap="round" stroke-dasharray="2.4 2.6"/><path d="M5.5 9.5V5.5h4M14.5 18.5h4v-4" style="fill:none;stroke:currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 13.5 13.5 4H18a2 2 0 0 1 2 2v4.5L10.5 20H6a2 2 0 0 1-2-2z" style="fill:currentColor" opacity=".28"/>',
     cube: '<path d="M12 3 20 7.5v9L12 21l-8-4.5v-9z" style="fill:none;stroke:currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M4 7.5 12 12l8-4.5M12 12v9" style="fill:none;stroke:currentColor" stroke-width="1.7" stroke-linejoin="round"/>',
     hammer: '<path d="M4 20l8.5-8.5M10.5 6.5l4-3 6 6-3 4z" style="fill:none;stroke:currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>',
+    pin: '<path d="M12 21s-6.5-5.7-6.5-11.2a6.5 6.5 0 0 1 13 0C18.5 15.3 12 21 12 21z" style="fill:none;stroke:currentColor" stroke-width="2" stroke-linejoin="round"/><circle cx="12" cy="9.8" r="2.3" style="fill:none;stroke:currentColor" stroke-width="2"/>',
+    slope: '<path d="M3.5 18.5h17V7.5z" style="fill:none;stroke:currentColor" stroke-width="2.1" stroke-linejoin="round"/>',
+    side: '<rect x="3" y="8.5" width="18" height="7" rx="1.8" style="fill:none;stroke:currentColor" stroke-width="2.1"/><path d="M8 8.5v7M16 8.5v7" style="stroke:currentColor" stroke-width="2.1" stroke-linecap="round"/>',
+    rib: '<path d="M5 5v14M19 5v14M5 12h14" style="fill:none;stroke:currentColor" stroke-width="2.1" stroke-linecap="round"/>',
+    phone: '<rect x="7" y="3" width="10" height="18" rx="2.6" style="fill:none;stroke:currentColor" stroke-width="2"/><path d="M11 17.6h2" style="stroke:currentColor" stroke-width="2" stroke-linecap="round"/>',
   };
   const icon = (n, cls = "") => `<svg class="ico ${cls}" viewBox="0 0 24 24" aria-hidden="true" focusable="false">${ICON[n]}</svg>`;
 
@@ -112,16 +120,36 @@ export function createUI(root, handlers) {
         </div>
       </div>
     </section>
-    <div class="ui-stage" role="region" aria-label="3D-модель пандуса"></div>
+    <div class="ui-stage" role="region" aria-label="3D-модель пандуса">${LIVING ? '<div class="stage-ambient" aria-hidden="true"><div class="stage-orb-glow glow-a"></div><div class="stage-orb-glow glow-b"></div></div>' : ""}</div>
   </div>
 
-  <header class="ui-title material">
+  ${LIVING ? `<header class="ui-title lv-title">
+    <div class="lv-top">
+      <div class="lv-lockup">
+        <div class="ui-brand">GoApsny <span aria-hidden="true">·</span> Stopgap</div>
+        <div class="lv-word"><h1 class="t-large">Пандус</h1><span class="brand-spark" aria-hidden="true"></span></div>
+      </div>
+      <div class="lv-top-right">
+        <button type="button" class="mood-cycle-btn lv-shell-btn" data-shell-phone aria-label="Показать в корпусе телефона" title="Показать в корпусе телефона">${icon("phone")}<span>Телефон</span></button>
+        <button type="button" class="mood-cycle-btn" data-mood-cycle aria-label="Сменить цвет настроения" title="Сменить цвет настроения">
+          <span class="mood-sw s-sage"></span><span class="mood-sw s-orchid"></span><span class="mood-sw s-lime"></span>
+        </button>
+      </div>
+    </div>
+    <p class="ui-tag">Приставной пандус IDLab под ваш вход: замер, расчёт 1:6, сборка</p>
+    <nav class="pill-tabs" aria-label="Разделы">
+      <button type="button" class="pill-tab tab-pink" data-home aria-current="page">${icon("cube")}<span>Конструктор</span></button>
+      <button type="button" class="pill-tab tab-dark" data-map-open>${icon("pin")}<span>Карта</span></button>
+      <button type="button" class="pill-tab tab-lime" data-intake-open>${icon("plus")}<span>Новый замер</span></button>
+    </nav>
+    <p class="ui-sub stage-status-pill num-tab"><span class="status-dot" data-sub-dot aria-hidden="true"></span><span data-sub></span></p>
+  </header>` : `<header class="ui-title material">
     <div class="ui-brand">GoApsny <span aria-hidden="true">·</span> Stopgap</div>
     <h1 class="t-large">Пандус</h1>
     <p class="ui-tag">Приставной пандус IDLab под ваш вход: замер, расчёт 1:6, сборка</p>
     <p class="ui-sub num-tab" data-sub></p>
     <button type="button" class="ik-entry" data-intake-open>${icon("plus")}<span>Новый замер</span></button>
-  </header>
+  </header>`}
 
   <div class="ui-tools material" role="toolbar" aria-label="Инструменты модели" aria-orientation="vertical">
     <button type="button" class="tool" data-tool="spin" aria-pressed="false" title="Вращать модель">${icon("spin")}<span>Вращение</span></button>
@@ -148,6 +176,7 @@ export function createUI(root, handlers) {
     <div class="ui-scroll" data-scroll>
       <div class="ui-main" data-main>
         <div class="ui-head ui-dragzone">
+          ${LIVING ? '<div class="hero-shimmer" aria-hidden="true"></div>' : ""}
           <div class="ui-head-row">
             <div class="ui-head-text">
               <div class="head-cap">Ширина × длина</div>
@@ -156,6 +185,7 @@ export function createUI(root, handlers) {
             </div>
             <button type="button" class="btn-prominent" data-story-open>${icon("steps")}<span>Сборка</span></button>
           </div>
+          ${LIVING ? '<div class="mastery-bars" data-caps role="img" aria-label="Полнота замера"><div class="m-bar"><div class="m-fill m-white"></div></div><div class="m-bar"><div class="m-fill m-pink"></div></div><div class="m-bar"><div class="m-fill m-lime"></div></div></div>' : ""}
           <div class="tiles" data-tiles></div>
         </div>
 
@@ -173,6 +203,7 @@ export function createUI(root, handlers) {
             ${bigRow("width", "Ширина пандуса", "не больше свободной", 10, "10 мм")}
             <button type="button" class="row row-action" data-fit>Взять по свободной ширине</button>
             <div class="row-ab">${abCol("hl", "А", "слева")}${abCol("hr", "Б", "справа")}</div>
+            ${LIVING ? '<div class="activity-bars" data-profile aria-hidden="true"></div>' : ""}
             <div class="row-effect" data-effect aria-live="polite"></div>
             <div class="row row-field">
               <span class="row-label" id="l-board">Доска<span class="row-sub">боковины, мм</span></span>
@@ -295,7 +326,7 @@ export function createUI(root, handlers) {
         <p class="t-foot c2 story-hint">Листайте шаги жестом влево-вправо или стрелками на клавиатуре.</p>
       </section>
     </div>
-  </aside>`;
+  </aside>${LIVING ? '<div class="lv-toast" data-toast role="status" aria-live="polite"></div>' : ""}`;
 
   const stageEl = $(".ui-stage");
   const panel = $(".ui-panel");
@@ -786,7 +817,7 @@ export function createUI(root, handlers) {
   const detPx = (k) => {
     const H = window.innerHeight;
     if (k === "medium" && st.story) return Math.round(H * 0.6);
-    if (k === "peek") return Math.round(Math.max(H * DET.peek, 196));
+    if (k === "peek") return LIVING ? Math.round(Math.min(Math.max(H * 0.3, 252), H * 0.5)) : Math.round(Math.max(H * DET.peek, 196));
     return Math.round(H * DET[k]);
   };
   let sheetOff = 0;
@@ -923,7 +954,7 @@ export function createUI(root, handlers) {
   function shareCode() {
     const p = st.model ? st.model.params : null;
     if (!p) return "";
-    try { return SHARE.toHashName(SHARE.encode({ ...p, paint: st.paint })); } catch (e) { return "⚠ " + (e && e.message || "код не построен"); }
+    try { return SHARE.toHashName(SHARE.encode({ ...p, paint: st.paint })); } catch (e) { return "Ошибка: " + (e && e.message || "код не построен"); }
   }
   function cutSVG(sheet) {
     const W = sheet.size.h, H = sheet.size.w;                       // лист кладём горизонтально
@@ -971,17 +1002,37 @@ export function createUI(root, handlers) {
     const diff = +(Math.abs(p.hl - p.hr)).toFixed(4);
     $("[data-sub]").textContent = sk ? `А ${num(p.hl)} · Б ${num(p.hr)} · перекос ${num(diff)} мм` : `ровный ${num(p.hl)} мм`;
     // шапка шторки
-    $("[data-head-title]").textContent = `${num(d.ply.width)} × ${d.totalLen} мм`;
+    const headT = `${num(d.ply.width)} × ${d.totalLen}`;
+    if (LIVING) { const ht = $("[data-head-title]"); ht.innerHTML = `${esc(headT)}<small> мм</small>`; ht.style.setProperty("--len", headT.length + 2); }
+    else $("[data-head-title]").textContent = `${headT} мм`;
     const errs = m.issues.filter((x) => x.level === "error").length, warns = m.issues.length - errs;
     const stt = errs ? ["err", "Есть ошибка в замере"] : warns ? ["warn", "Замер неполный"] : ["ok", "Замер полный"];
     const stEl = $("[data-status]");
     stEl.className = "status status-" + stt[0];
     stEl.innerHTML = `${icon(stt[0] === "err" ? "error" : stt[0] === "warn" ? "warn" : "ok", "st-ico")}<span>${esc(stt[1])}</span>`;
-    $("[data-tiles]").innerHTML = [
-      ["Уклон", slopeTxt(d.slope)],
-      ["Боковина", `${d.left.height}${sk ? ` / ${d.right.height}` : ""}`],
-      ["Ребро", d.rib ? "есть" : "нет"],
-    ].map(([k, v]) => `<div class="tile"><span class="tile-k">${k}</span><span class="tile-v num-tab">${esc(v)}</span></div>`).join("");
+    const tileData = [
+      ["Уклон", slopeTxt(d.slope), "slope"],
+      ["Боковина", `${d.left.height}${sk ? ` / ${d.right.height}` : ""}`, "side"],
+      ["Ребро", d.rib ? "есть" : "нет", "rib"],
+    ];
+    if (LIVING) {
+      // плитка, чьё значение изменилось, коротко «подпрыгивает»
+      const was = st.tileVals || {};
+      $("[data-tiles]").innerHTML = tileData.map(([k, v, ic]) => `<div class="tile${prev && was[ic] != null && was[ic] !== v ? " pop" : ""}"><span class="tile-k">${icon(ic)}<span>${k}</span></span><span class="tile-v num-tab">${esc(v)}</span></div>`).join("");
+      st.tileVals = Object.fromEntries(tileData.map(([, v, ic]) => [ic, v]));
+      clearTimeout(st.popTimer);
+      st.popTimer = setTimeout(() => $$(".tile.pop").forEach((t) => t.classList.remove("pop")), 320);
+      const sd = $("[data-sub-dot]"); if (sd) sd.className = "status-dot " + (errs ? "error" : warns ? "loading" : "ready");
+      // три капсулы полноты замера: свободная ширина, пандус помещается, высоты А и Б
+      const free = p.freeWidth > 0, fits = free && p.width <= p.freeWidth, hs = p.hl > 0 && p.hr > 0;
+      const caps = [free ? 100 : 10, fits ? 100 : free ? 45 : 10, hs ? 100 : 10];
+      $$("[data-caps] .m-fill").forEach((f, i) => { f.style.width = caps[i] + "%"; });
+      $("[data-caps]").setAttribute("aria-label", `Полнота замера: свободная ширина ${free ? "измерена" : "не измерена"}, пандус ${fits ? "помещается" : free ? "шире свободной ширины" : "не сверен с проёмом"}, высоты А и Б ${hs ? "заданы" : "не заданы"}`);
+      // живой профиль пандуса: столбики растут от носка к ступени, высота — от порога
+      const pe = $("[data-profile]"), N = 24, k = Math.min(1, Math.max(p.hl, p.hr) / 200), g = Math.min(p.hl, p.hr) / Math.max(p.hl, p.hr, 1);
+      if (!pe.childElementCount) pe.innerHTML = Array.from({ length: N }, (_, i) => `<span class="act-bar a${i % 4}"></span>`).join("");
+      Array.from(pe.children).forEach((b, i) => { const t = (i + 1) / N; b.style.height = (5 + 21 * t * k * (i % 2 ? g : 1)).toFixed(1) + "px"; });
+    } else $("[data-tiles]").innerHTML = tileData.map(([k, v]) => `<div class="tile"><span class="tile-k">${k}</span><span class="tile-v num-tab">${esc(v)}</span></div>`).join("");
     // схема
     const sc = schemaSVG(m);
     const scEl = $("[data-schema]");
@@ -1044,13 +1095,33 @@ export function createUI(root, handlers) {
   function setPaint(hex) { st.paint = hex ? String(hex).toUpperCase() : null; syncPaint(); if (st.model) $("[data-share-code]").textContent = shareCode(); }
 
   $$("[data-intake-open]").forEach((bt) => bt.addEventListener("click", () => call("onIntake")));
+  $$("[data-map-open]").forEach((bt) => bt.addEventListener("click", () => call("onMap")));
+  $("[data-mood-cycle]")?.addEventListener("click", (e) => { const r = e.currentTarget.getBoundingClientRect(); call("onMood", { x: r.left + r.width / 2, y: r.top + r.height / 2 }); });
+  $("[data-shell-phone]")?.addEventListener("click", () => call("onShell", "phone"));
+  $("[data-home]")?.addEventListener("click", () => { if (st.story) openStory(null); if (mqPhone.matches) snap("peek"); scroller.scrollTo({ top: 0, behavior: mqReduce.matches ? "auto" : "smooth" }); });
+  // всплывающая капсула-сообщение (только «живая» оболочка)
+  let toastTimer = 0;
+  function toast(t) {
+    const el = $("[data-toast]"); if (!el) return;
+    el.textContent = t; el.classList.add("show");
+    clearTimeout(toastTimer); toastTimer = setTimeout(() => el.classList.remove("show"), 1600);
+  }
+  const MOOD_NAMES = { sage: "Мята", orchid: "Орхидея", lime: "Лайм", night: "Ночь" };
+  let moodSeen = false;
+  function setMood(m) {
+    const b = $("[data-mood-cycle]"); if (!b) return;
+    b.title = `Настроение: ${MOOD_NAMES[m] || m}. Сменить`;
+    if (moodSeen) toast(MOOD_NAMES[m] || m);
+    moodSeen = true;
+  }
   $$("[data-export]").forEach((bt) => bt.addEventListener("click", () => call("onExport", bt.dataset.export)));
   $("[data-copy-code]").addEventListener("click", async () => {
     const code = shareCode(), btn = $("[data-copy-code]");
     let ok = false;
-    if (code.startsWith("⚠")) return;
+    if (code.startsWith("Ошибка")) return;
     try { await navigator.clipboard.writeText(code); ok = true; } catch { ok = false; }
     btn.textContent = ok ? "Код скопирован" : "Выделите код и скопируйте вручную";
+    if (ok) toast("Код скопирован");
     setTimeout(() => { btn.textContent = "Скопировать код"; }, 2200);
   });
 
@@ -1080,6 +1151,7 @@ export function createUI(root, handlers) {
     setPlaying,
     setPaint,
     exportNote,
+    setMood,
     setStep: (id) => openStory(id || null, false),
     setMode: (v) => { if (MODES.some((x) => x.v === v)) { st.mode = v; setSeg(modesEl, v); st.xray = v === "xray"; st.blueprint = v === "blueprint"; applySplit(); } },
   };
