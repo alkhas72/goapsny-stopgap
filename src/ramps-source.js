@@ -148,14 +148,20 @@ export function createRampsSource(opts = {}) {
     return { place_id: uuidOr(rec.place_id), name: str(rec.name, 300), address: str(rec.address), entrance: str(rec.entrance, 200), lat: rec.lat, lng: rec.lng };
   }
   // Куда вернуть человека после заявки: только https и только свои узлы — тот же сайт, goapsny.org с поддоменами,
-  // goapsny-mvp.vercel.app. Любой другой адрес → null, чтобы ссылкой нельзя было увести на чужой сайт
+  // goapsny-mvp.vercel.app. Любой другой адрес → null, чтобы ссылкой нельзя было увести на чужой сайт.
+  // Пробные сборки (…-alkhas72s-projects.vercel.app) возвращают друг к другу, только когда сам Stopgap открыт
+  // на пробной сборке: имя вида «что-то-alkhas72s-projects» может занять на vercel.app кто угодно, поэтому
+  // с боевого адреса такой возврат не принимается.
+  const PREVIEW_HOST = /^[a-z0-9-]+-alkhas72s-projects\.vercel\.app$/;
   function safeReturn(v, origin) {
     if (typeof v !== "string" || !v.trim() || v.length > 2000) return null;
     let u; try { u = new URL(v.trim()); } catch { return null; }
     if (u.protocol !== "https:" || u.username || u.password) return null;
     const host = u.hostname.toLowerCase();
     let own = null; try { own = origin ? new URL(origin) : null; } catch {}
-    const ok = host === "goapsny.org" || host.endsWith(".goapsny.org") || host === "goapsny-mvp.vercel.app" || (!!own && own.protocol === "https:" && u.origin === own.origin);
+    const mine = !!own && own.protocol === "https:";
+    const ok = host === "goapsny.org" || host.endsWith(".goapsny.org") || host === "goapsny-mvp.vercel.app" || (mine && u.origin === own.origin)
+      || (mine && PREVIEW_HOST.test(own.hostname.toLowerCase()) && PREVIEW_HOST.test(host));
     return ok ? u.href : null;
   }
   // Ссылка «замерить вход» с карты доступности: ?measure=1&place_id=…&name=…&address=…&entrance=…&lat=…&lng=…&return=…

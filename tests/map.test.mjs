@@ -240,6 +240,12 @@ test("адрес возврата: только https и только свои �
     "https://user:pass@goapsny.org/", "javascript:alert(1)", "//goapsny.org/", "/local", "data:text/html,x", "", null, 42, "https://other.vercel.app/",
   ]) assert.equal(S.safeReturn(bad, own), null, String(bad));
   assert.equal(S.safeReturn("http://localhost:8765/x", "http://localhost:8765"), null);   // свой узел тоже только по https
+  // пробные сборки возвращают друг к другу; с боевого адреса возврат на пробную сборку не принимается
+  const pv = "https://goapsny-stopgap-ol77k36h2-alkhas72s-projects.vercel.app", mapPv = "https://goapsny-abc123-alkhas72s-projects.vercel.app/?mapper=1";
+  assert.equal(S.safeReturn(mapPv, pv), mapPv);
+  assert.equal(S.safeReturn(mapPv, own), null);
+  assert.equal(S.safeReturn(mapPv, "https://goapsny-stopgap.vercel.app"), null);
+  for (const bad of ["https://alkhas72s-projects.vercel.app/", "https://x-alkhas72s-projects.vercel.app.evil.example/", "http://goapsny-abc-alkhas72s-projects.vercel.app/", "https://evil.vercel.app/"]) assert.equal(S.safeReturn(bad, pv), null, bad);
   assert.equal(S.prefillFromQuery("?measure=1&return=" + encodeURIComponent("https://evil.example/"), { origin: own }).returnUrl, null);
   assert.equal(S.prefillFromQuery("?measure=1&return=" + encodeURIComponent("https://stopgap.example/x"), { origin: own }).returnUrl, "https://stopgap.example/x");
 });
