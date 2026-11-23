@@ -1,0 +1,319 @@
+/* «Живая» оболочка: мастер «Новый замер» (src/intake.js). Только внешний вид; селекторы под :root[data-skin=living].
+   Токены и общие детали (кнопки, карточки, поля, сегменты) — в skin-living.css; здесь то, что есть только в мастере.
+   Порядок: 1) экран и шапка, 2) шаг: заголовок, съёмка, поля, 3) низ и приглашение помощника,
+   4) окно «Голосом», 5) итог и сводка, 6) телефон и компьютер, 7) движение. */
+
+/* ================= 1. ЭКРАН И ШАПКА ================= */
+:root[data-skin=living] .ik { --ik-pad: 18px; }
+:root[data-skin=living] .ik-card { border-radius: var(--r-sheet); background: var(--bg); box-shadow: var(--shadow); }
+:root[data-skin=living] .ik-head { position: relative; z-index: 2; padding: 16px var(--ik-pad) 8px; box-shadow: none; }
+/* вместо линии под шапкой и над кнопками — мягкое затухание содержимого */
+:root[data-skin=living] .ik-head::after, :root[data-skin=living] .ik-foot::before {
+  content: ""; position: absolute; left: 0; right: 0; height: 18px; pointer-events: none;
+}
+:root[data-skin=living] .ik-head::after { top: 100%; background: linear-gradient(to bottom, var(--bg), transparent); }
+:root[data-skin=living] .ik-foot::before { bottom: 100%; background: linear-gradient(to top, var(--bg), transparent); }
+
+:root[data-skin=living] .ik-close {
+  height: 38px; margin-left: 0; padding: 0 15px 0 8px; gap: 3px; border-radius: 999px;
+  background: var(--cell); box-shadow: 0 4px 14px rgba(0, 0, 0, .06); color: var(--label);
+  font-size: 12.5px; line-height: 16px; font-weight: 600; transition: transform .24s var(--spring);
+}
+:root[data-skin=living] .ik-close:hover { background: var(--cell); }
+:root[data-skin=living] .ik-close .ico { width: 18px; height: 18px; }
+:root[data-skin=living] .ik-count { font-size: 10.5px; line-height: 14px; font-weight: 700; letter-spacing: .08em; color: var(--label-2); }
+
+/* прогресс: капсулы; пройдено — уголь, текущий шаг — орхидея, шире остальных */
+:root[data-skin=living] .ik-prog { display: flex; gap: 5px; margin-top: 12px; }
+:root[data-skin=living] .ik-prog li { flex: 1 1 0; min-width: 0; }
+:root[data-skin=living] .ik-prog li.cur { flex-grow: 2.4; }
+:root[data-skin=living] .ik-prog button { padding: 5px 0 3px; gap: 6px; border-radius: 999px; }
+:root[data-skin=living] .ik-seg { height: 7px; border-radius: 999px; background: var(--fill-2); transition: background-color .3s, transform .24s var(--spring); }
+:root[data-skin=living] .ik-prog .done .ik-seg { background: var(--prominent); }
+:root[data-skin=living] .ik-prog .cur .ik-seg { background: var(--orchid); box-shadow: 0 0 0 3px rgba(232, 140, 200, .22); }
+:root[data-skin=living] .ik-prog button:not(:disabled):hover .ik-seg { filter: none; transform: scaleY(1.5); }
+:root[data-skin=living] .ik-seg-l { font-size: 10px; line-height: 13px; font-weight: 600; letter-spacing: 0; }
+
+/* ================= 2. ШАГ ================= */
+:root[data-skin=living] .ik-body { padding: 16px var(--ik-pad) 30px; scrollbar-width: none; }
+:root[data-skin=living] .ik-body::-webkit-scrollbar { display: none; }
+:root[data-skin=living] .ik-title { font-size: 30px; line-height: 34px; font-weight: 300; letter-spacing: -.04em; padding: 0 6px; color: var(--title-ink); }
+/* заголовок шага получает фокус программно (для чтения с экрана): кольца не рисуем */
+:root[data-skin=living] .ik-title:focus-visible { outline: none; }
+:root[data-skin=living] .ik-lead { font-size: 15px; line-height: 21px; color: var(--label-2); padding: 8px 6px 16px; }
+:root[data-skin=living] .ik-title + .group { margin-top: 14px; }
+:root[data-skin=living] .ik-dist { font-size: 14px; line-height: 19px; }
+:root[data-skin=living] .ik-narrow { padding: 10px 24px 0; }
+
+/* окно съёмки — главное на шаге: карточка в цветах настроения с живым бликом и белым кругом камеры */
+:root[data-skin=living] .group.ik-media { background: none; box-shadow: none; border-radius: 0; overflow: visible; }
+:root[data-skin=living] .ik-shot {
+  position: relative; isolation: isolate; width: 100%; margin: 0; gap: 14px; border: 0; border-radius: var(--r-card);
+  background: linear-gradient(120deg, var(--hero-a) 0%, var(--hero-b) 100%); color: var(--hero-ink);
+  box-shadow: 0 14px 30px var(--hero-shadow); transition: transform .3s var(--spring), box-shadow .25s ease;
+}
+:root[data-skin=living] .ik-shot::before, :root[data-skin=living] .ik-shot::after {
+  content: ""; position: absolute; z-index: -1; border-radius: 50%; pointer-events: none;
+}
+:root[data-skin=living] .ik-shot::before { width: 220px; height: 220px; top: -70px; right: -50px; background: radial-gradient(circle, rgba(234, 243, 114, .4), transparent 70%); }
+:root[data-skin=living] .ik-shot::after { width: 260px; height: 260px; bottom: -120px; left: -80px; background: radial-gradient(circle, rgba(255, 255, 255, .3), transparent 70%); }
+:root[data-skin=living] button.ik-shot:hover { border-color: transparent; }
+:root[data-skin=living] button.ik-shot:not(.ik-shot-has):active { transform: scale(.97); }
+:root[data-skin=living] .ik-shot-ico {
+  width: 84px; height: 84px; border-radius: 50%; background: #ffffff; color: #161817;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, .14), 0 0 0 0 rgba(255, 255, 255, .5); transition: transform .3s var(--spring);
+}
+:root[data-skin=living] .ik-shot-ico .ico { width: 34px; height: 34px; }
+:root[data-skin=living] .ik-shot-t { font-size: 17px; line-height: 22px; font-weight: 500; letter-spacing: -.02em; }
+:root[data-skin=living] .ik-shot-s { color: inherit; opacity: .8; }
+:root[data-skin=living] .ik-shot-has { background: #0c0d0c; box-shadow: var(--card-shadow); }
+:root[data-skin=living] .ik-shot-has::before, :root[data-skin=living] .ik-shot-has::after { display: none; }
+
+:root[data-skin=living] .ik-thumbs { gap: 8px; padding: 10px 0 0; }
+:root[data-skin=living] .ik-th { border-radius: 16px; }
+:root[data-skin=living] .ik-strip .ik-th { border-radius: 10px; }
+:root[data-skin=living] .ik-th-x { background: rgba(22, 24, 23, .62); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); transition: transform .22s var(--spring); }
+:root[data-skin=living] .ik-th-x:active { transform: scale(.86); }
+:root[data-skin=living] .ik-th-t { border-radius: 999px; padding: 0 6px; background: rgba(22, 24, 23, .62); }
+:root[data-skin=living] .ik-cap-row { gap: 8px; padding: 12px 0 2px; align-items: center; }
+:root[data-skin=living] .ik-cap-row .btn-filled, :root[data-skin=living] .ik-cap-row .btn-plain {
+  flex: none; height: 40px; padding: 0 15px 0 11px; gap: 6px; background: var(--cell); color: var(--label);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, .06); font-size: 12.5px; font-weight: 600;
+}
+:root[data-skin=living] .ik-cap-row .ico { width: 18px; height: 18px; padding: 0; background: none; color: inherit; }
+:root[data-skin=living] .ik-cap-n { font-size: 11.5px; font-weight: 600; color: var(--label-2); }
+:root[data-skin=living] .ik-cap-busy { padding: 12px 6px 0; font-size: 13px; line-height: 18px; }
+:root[data-skin=living] .ik-spin { border-color: var(--fill-2); border-top-color: var(--orchid); }
+:root[data-skin=living] .ik-media .banner-in { margin-top: 12px; border-radius: var(--r-tile); }
+:root[data-skin=living] .ik-media-note { padding: 0 6px 10px; }
+
+/* число замера — герой шага */
+:root[data-skin=living] .ik .ik-num { padding-top: 14px; padding-bottom: 14px; }
+:root[data-skin=living] .ik .big-input { height: 60px; }
+:root[data-skin=living] .ik .big-input input { font-size: 48px; line-height: 60px; height: 60px; }
+:root[data-skin=living] .ik .big-input input::placeholder { font-size: 22px; }
+:root[data-skin=living] .ik .big-input .unit { line-height: 60px; }
+/* фокус поля показывает его подложка (орхидея), рамка вокруг самого текста не нужна */
+:root[data-skin=living] .ik .big-input input:focus-visible,
+:root[data-skin=living] .ik .ik-text input:focus-visible,
+:root[data-skin=living] .ik .ik-text textarea:focus-visible,
+:root[data-skin=living] .ik .ik-compose textarea:focus-visible { outline: none; }
+
+/* текстовые поля и роли */
+:root[data-skin=living] .ik-text { gap: 3px; padding: 12px 18px 10px; transition: background-color .2s; }
+:root[data-skin=living] .ik-text-l { font-size: 10.5px; line-height: 14px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--label-2); }
+:root[data-skin=living] .ik-text-l .row-sub { font-size: inherit; font-weight: 600; opacity: .8; }
+:root[data-skin=living] .ik-text input, :root[data-skin=living] .ik-text textarea { font: 400 17px/23px var(--font); letter-spacing: -.02em; }
+:root[data-skin=living] .ik-text:focus-within { background: var(--tint-soft); }
+:root[data-skin=living] .ik-role { min-height: 52px; transition: background-color .2s; }
+:root[data-skin=living] .ik-role[aria-checked="true"] { font-weight: 600; }
+:root[data-skin=living] .ik-ck {
+  width: 24px; height: 24px; padding: 4px; border-radius: 50%; background: var(--lime); color: #161817;
+  transform: scale(.4); transition: opacity .2s, transform .34s var(--spring);
+}
+:root[data-skin=living] .ik-role[aria-checked="true"] .ik-ck { transform: scale(1); }
+:root[data-skin=living] .ik-asis { font-size: 12px; line-height: 17px; }
+
+/* ================= 3. НИЗ: ПРИГЛАШЕНИЕ ПОМОЩНИКА И КНОПКИ ================= */
+:root[data-skin=living] .ik-foot { position: relative; z-index: 2; padding: 6px var(--ik-pad) calc(12px + var(--safe-b)); box-shadow: none; background: var(--bg); }
+:root[data-skin=living] .ik-reason { font-size: 12.5px; line-height: 17px; padding: 0 8px 8px; }
+:root[data-skin=living] .ik-nav { gap: 8px; }
+:root[data-skin=living] .ik-nav > .btn-plain { flex: .8; }
+:root[data-skin=living] .ik-nav > .btn-filled { flex: 1.2; }
+:root[data-skin=living] .ik-nav .btn-filled[aria-disabled="true"] { opacity: .38; }
+
+:root[data-skin=living] .ik-invite {
+  gap: 11px; margin: 0 0 10px; padding: 8px 8px 8px 10px; border-radius: 24px; background: var(--cell);
+  box-shadow: var(--card-shadow); transition: transform .25s var(--spring);
+}
+:root[data-skin=living] .ik-invite:active { transform: scale(.97); }
+:root[data-skin=living] .ik-ai-av { background: #161817; color: var(--lime); box-shadow: none; }
+:root[data-skin=living] .ik-invite .ik-ai-av { width: 38px; height: 38px; }
+:root[data-skin=living] .ik-invite-n { font-size: 10.5px; line-height: 14px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--tint-ink); }
+:root[data-skin=living] .ik-invite-s { font-size: 14px; line-height: 19px; }
+:root[data-skin=living] .ik-invite-mic, :root[data-skin=living] .ik-fmic {
+  background: var(--orchid); color: #ffffff; box-shadow: 0 8px 20px rgba(232, 140, 200, .42);
+  transition: transform .25s var(--spring);
+}
+:root[data-skin=living] .ik-invite-mic { width: 50px; height: 50px; }
+:root[data-skin=living] .ik-invite-mic .ico { width: 24px; height: 24px; }
+
+/* ================= 4. ОКНО «ГОЛОСОМ» ================= */
+:root[data-skin=living] .ik-ai { background: var(--bg); box-shadow: none; overflow: hidden; isolation: isolate; }
+/* живой фон окна: два световых пятна, как на сцене эталона */
+:root[data-skin=living] .ik-ai::before, :root[data-skin=living] .ik-ai::after {
+  content: ""; position: absolute; z-index: -1; border-radius: 50%; filter: blur(55px); opacity: .5; pointer-events: none;
+}
+:root[data-skin=living] .ik-ai::before { width: 240px; height: 240px; top: 30px; left: -70px; background: var(--orchid); opacity: .28; }
+:root[data-skin=living] .ik-ai::after { width: 260px; height: 260px; bottom: 150px; right: -90px; background: var(--hero-a); }
+:root[data-skin=living] .ik-ai-head { padding: 14px 12px 6px 24px; }
+:root[data-skin=living] .ik-ai-head .ik-ai-name { font-size: 30px; line-height: 34px; font-weight: 300; letter-spacing: -.04em; }
+:root[data-skin=living] .ik-ai-x {
+  width: 40px; height: 40px; border-radius: 50%; background: var(--cell); box-shadow: 0 4px 14px rgba(0, 0, 0, .06);
+  transition: transform .24s var(--spring);
+}
+:root[data-skin=living] .ik-ai-x:active { transform: scale(.9); }
+:root[data-skin=living] .ik-ai-x .ico { width: 18px; height: 18px; }
+:root[data-skin=living] .ik-zoom-x { background: rgba(255, 255, 255, .18); box-shadow: none; }
+:root[data-skin=living] .ik-ai-note { margin: 8px 18px 0; padding: 10px 14px; border-radius: 16px; }
+:root[data-skin=living] .ik-tip { margin: 10px 18px 0; padding: 11px 14px 12px; border-radius: var(--r-tile); }
+:root[data-skin=living] .ik-tip-l { font-size: 10.5px; letter-spacing: .08em; }
+:root[data-skin=living] .ik-log { padding: 12px 18px; gap: 8px; scrollbar-width: none; }
+:root[data-skin=living] .ik-log::-webkit-scrollbar { display: none; }
+:root[data-skin=living] .ik-msg { padding: 10px 14px 11px; border-radius: 20px; font-size: 15px; line-height: 20px; }
+:root[data-skin=living] .ik-msg-me { border-bottom-right-radius: 7px; }
+:root[data-skin=living] .ik-msg-ai { border-bottom-left-radius: 7px; box-shadow: var(--card-shadow); }
+:root[data-skin=living] .ik-msg-media img { border-radius: 10px; }
+:root[data-skin=living] .ik-sug { border-radius: 16px; padding: 8px 14px; background: var(--lime); color: #161817; font-size: 14px; transition: transform .22s var(--spring); }
+:root[data-skin=living] .ik-sug:active { transform: scale(.95); }
+:root[data-skin=living] .ik-sug.is-taken { background: var(--green-soft); color: var(--green-ink); }
+:root[data-skin=living] .ik-quick { padding: 2px 18px 10px; gap: 7px; }
+:root[data-skin=living] .ik-chip {
+  height: 36px; padding: 0 14px; border-radius: 999px; background: var(--cell); color: var(--label);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, .06); font-size: 12.5px; transition: transform .24s var(--spring);
+}
+:root[data-skin=living] .ik-chip:hover:not(:disabled) { background: var(--cell); transform: translateY(-2px); }
+:root[data-skin=living] .ik-chip:active:not(:disabled) { transform: scale(.92); }
+:root[data-skin=living] .ik-chip:disabled { color: var(--label-3); box-shadow: none; background: var(--fill); }
+:root[data-skin=living] .ik-compose { padding: 4px 14px 6px; }
+:root[data-skin=living] .ik-compose textarea {
+  min-height: 44px; border-radius: 22px; padding: 11px 16px; background: var(--cell);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, .05); font: 400 17px/22px var(--font); letter-spacing: -.02em;
+}
+:root[data-skin=living] .ik-compose textarea:focus { box-shadow: 0 0 0 2px var(--orchid); }
+:root[data-skin=living] .ik-cbtn { width: 44px; height: 44px; transition: transform .24s var(--spring); }
+:root[data-skin=living] .ik-cbtn:not(:disabled):active { transform: scale(.9); }
+:root[data-skin=living] .ik-send { background: var(--prominent); color: var(--on-prominent); }
+:root[data-skin=living] .ik-dictate { font-size: 11.5px; }
+
+/* микрофон на «куполе»: живой якорь внизу окна */
+:root[data-skin=living] .ik-micbar { position: relative; isolation: isolate; gap: 10px; padding: 14px 18px calc(18px + var(--safe-b)); }
+:root[data-skin=living] .ik-micbar::before {
+  content: ""; position: absolute; z-index: -1; left: 50%; top: 46px; width: 150%; height: 340px; transform: translateX(-50%);
+  border-radius: 50%; pointer-events: none; opacity: .55;
+  background: radial-gradient(circle at 50% 18%, var(--hero-a), var(--hero-b));
+  box-shadow: 0 -10px 36px var(--hero-shadow);
+}
+:root[data-skin=living] .ik-mic {
+  width: 88px; height: 88px; background: var(--orchid); color: #ffffff;
+  box-shadow: 0 12px 28px rgba(232, 140, 200, .48); transition: transform .3s var(--spring), background-color .25s, color .25s;
+}
+:root[data-skin=living] .ik-mic .ico { width: 36px; height: 36px; }
+:root[data-skin=living] .ik-mic[aria-pressed="true"] { background: var(--lime); color: #161817; animation: iklMic 1.3s ease-out infinite; }
+:root[data-skin=living] .ik-mic-s { font-size: 14px; line-height: 19px; font-weight: 500; color: var(--label); }
+:root[data-skin=living] .ik-fmic:active, :root[data-skin=living] .ik-mic:active { transform: scale(.92); }
+/* на розовом настроении розовый микрофон сливается с фоном: там он угольный */
+:root[data-skin=living][data-mood=orchid] .ik-mic:not([aria-pressed="true"]) { background: #271522; box-shadow: 0 12px 28px rgba(39, 21, 34, .3); }
+@keyframes iklMic { 0% { box-shadow: 0 0 0 0 rgba(234, 243, 114, .7); } 100% { box-shadow: 0 0 0 26px rgba(234, 243, 114, 0); } }
+
+/* узкий мастер: окно голоса занимает весь шаг */
+:root[data-skin=living] .ik-ai-max .ik-ai { background: var(--bg); }
+:root[data-skin=living] .ik-ai-max .ik-ai-bar { box-shadow: none; }
+:root[data-skin=living] .ik-zoom-h { padding-bottom: calc(10px + var(--safe-b)); }
+
+/* ================= 5. СВОДКА, ПОКРАСКА, ИТОГ ================= */
+:root[data-skin=living] .ik-sum-h { padding: 22px 6px 9px; font-size: 22px; line-height: 27px; font-weight: 300; letter-spacing: -.035em; align-items: center; }
+:root[data-skin=living] .ik-body > .ik-sum-h:nth-child(3) { padding-top: 4px; }
+:root[data-skin=living] .ik-edit {
+  padding: 6px 13px; border-radius: 999px; background: var(--soft); color: var(--label);
+  font-size: 12px; line-height: 16px; font-weight: 600; letter-spacing: 0; transition: transform .22s var(--spring);
+}
+:root[data-skin=living] .ik-edit:hover { background: var(--soft); transform: translateY(-1px); }
+:root[data-skin=living] .ik-edit:active { transform: scale(.93); }
+:root[data-skin=living] .ik-send-note { font-size: 12.5px; line-height: 17px; padding: 10px 8px 0; }
+:root[data-skin=living] .ik-sum-h + .group .kv-v { font-weight: 500; }
+:root[data-skin=living] .ik .row-kv .kv-v.c2 { color: var(--label); }
+:root[data-skin=living] .ik .row-kv > :first-child { color: var(--label-2); font-size: 13.5px; }
+:root[data-skin=living] .ik .ik-paint .finish-name { font-size: 22px; line-height: 27px; font-weight: 400; letter-spacing: -.03em; }
+:root[data-skin=living] .ik-ar-link { color: var(--tint-ink); }
+
+/* строки-действия «Скачать заявку», «Примерить в AR»: значок в лаймовом круге */
+:root[data-skin=living] .ik-dl, :root[data-skin=living] .ik-ar { min-height: 58px; gap: 10px; font-size: 15px; font-weight: 600; color: var(--label); transition: transform .25s var(--spring); }
+:root[data-skin=living] .ik-dl:active, :root[data-skin=living] .ik-ar:active { transform: scale(.97); }
+:root[data-skin=living] .ik-dl .ico, :root[data-skin=living] .ik-ar .ico { width: 32px; height: 32px; padding: 6px; border-radius: 50%; background: var(--lime); color: #161817; }
+
+:root[data-skin=living] .ik-done { padding: 34px 8px 6px; }
+:root[data-skin=living] .ik-done .ik-title { font-size: 32px; line-height: 36px; }
+:root[data-skin=living] .ik-done .ik-lead { padding-bottom: 8px; }
+:root[data-skin=living] .ik-done-ico {
+  width: 96px; height: 96px; margin-bottom: 20px; color: var(--lime); --on-sym: #161817;
+  border-radius: 50%; box-shadow: 0 0 0 12px rgba(234, 243, 114, .28), 0 16px 34px rgba(160, 172, 40, .3);
+}
+:root[data-skin=living] .ik-done-local .ik-done-ico { color: var(--orchid); --on-sym: #ffffff; border-radius: 0; box-shadow: none; filter: drop-shadow(0 12px 22px rgba(232, 140, 200, .4)); }
+
+/* ================= 6. ТЕЛЕФОН И КОМПЬЮТЕР ================= */
+@media (max-width: 819.98px) {
+  /* шаг занимает весь экран; с 3D наверху мастер остаётся шторкой */
+  :root[data-skin=living] .ik { top: 0; }
+  :root[data-skin=living] .ik-card { border-radius: 0; box-shadow: none; }
+  :root[data-skin=living] .ik-head { padding-top: calc(var(--safe-t) + 14px); }
+  :root[data-skin=living] .ik.ik-peek { top: 40vh; }
+  :root[data-skin=living] .ik.ik-peek .ik-card { border-radius: var(--r-sheet) var(--r-sheet) 0 0; box-shadow: var(--shadow-sheet); }
+  :root[data-skin=living] .ik.ik-peek .ik-head { padding-top: 22px; }
+  :root[data-skin=living] .ik.ik-peek .ik-head::before {
+    content: ""; position: absolute; top: 9px; left: 50%; width: 36px; height: 4px; margin-left: -18px; border-radius: 99px; background: var(--grabber);
+  }
+  :root[data-skin=living] .ik-title { font-size: 28px; line-height: 32px; }
+  :root[data-skin=living] .ik-body { padding-top: 14px; }
+  :root[data-skin=living] .ik-ai-head { padding-top: calc(var(--safe-t) + 12px); }
+  :root[data-skin=living] .ik.ik-peek .ik-ai-head { padding-top: 16px; }
+  :root[data-skin=living] .ik-ai-max .ik-ai-panel { padding-bottom: var(--safe-b); }
+  :root[data-skin=living] .ik-zoom-x { top: calc(var(--safe-t) + 10px); }
+}
+@media (max-width: 370px) {
+  :root[data-skin=living] .ik { --ik-pad: 14px; }
+  :root[data-skin=living] .ik-title { font-size: 25px; line-height: 29px; }
+  :root[data-skin=living] .ik .big-input input { font-size: 40px; }
+  :root[data-skin=living] .ik-invite-s { font-size: 13px; line-height: 18px; }
+}
+@media (min-width: 820px) {
+  :root[data-skin=living] .ik-head { padding: 18px 22px 8px; }
+  :root[data-skin=living] .ik { --ik-pad: 22px; }
+  :root[data-skin=living] .ik-shot { max-height: 340px; }
+}
+
+/* ================= 7. ДВИЖЕНИЕ ================= */
+@keyframes iklFloat {
+  0% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(22px, -18px) scale(1.08); }
+  100% { transform: translate(-16px, 20px) scale(.96); }
+}
+@keyframes iklRise { from { opacity: 0; transform: translateY(14px) scale(.97); } }
+@keyframes iklPop { 0% { opacity: 0; transform: scale(.4); } 70% { opacity: 1; } }
+@keyframes iklSeg { from { flex-grow: 1; } }
+@keyframes iklRing { 0% { box-shadow: 0 12px 28px rgba(0, 0, 0, .14), 0 0 0 0 rgba(255, 255, 255, .55); } 70%, 100% { box-shadow: 0 12px 28px rgba(0, 0, 0, .14), 0 0 0 20px rgba(255, 255, 255, 0); } }
+@keyframes iklBreathe { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.07); } }
+@keyframes iklDome { 0%, 100% { transform: translateX(-50%) scale(1); } 50% { transform: translateX(-50%) scale(1.04); } }
+@media (hover: hover) {
+  :root[data-skin=living] .ik-close:hover { transform: scale(1.05); }
+  :root[data-skin=living] button.ik-shot:not(.ik-shot-has):not(:disabled):hover { transform: translateY(-3px); box-shadow: 0 20px 38px var(--hero-shadow); }
+  :root[data-skin=living] button.ik-shot:not(:disabled):hover .ik-shot-ico { transform: scale(1.08); }
+  :root[data-skin=living] .ik-ai-x:hover { transform: scale(1.08); }
+  :root[data-skin=living] .ik-invite:hover .ik-invite-mic { transform: scale(1.08); }
+}
+:root[data-skin=living] .ik-close:active { transform: scale(.92); }
+:root[data-skin=living] .ik-invite:active .ik-invite-mic { transform: scale(.92); }
+@media (prefers-reduced-motion: no-preference) {
+  /* содержимое шага поднимается по очереди */
+  :root[data-skin=living] .ik-body > * { animation: iklRise .46s var(--spring) both; }
+  :root[data-skin=living] .ik-body > :nth-child(2) { animation-delay: .04s; }
+  :root[data-skin=living] .ik-body > :nth-child(3) { animation-delay: .08s; }
+  :root[data-skin=living] .ik-body > :nth-child(4) { animation-delay: .12s; }
+  :root[data-skin=living] .ik-body > :nth-child(n+5) { animation-delay: .16s; }
+  :root[data-skin=living] .ik-prog li.cur { animation: iklSeg .5s var(--spring); }
+  :root[data-skin=living] .ik-shot::before { animation: iklFloat 8s ease-in-out infinite alternate; }
+  :root[data-skin=living] .ik-shot::after { animation: iklFloat 11s ease-in-out infinite alternate-reverse; }
+  :root[data-skin=living] button.ik-shot:not(.ik-shot-has) .ik-shot-ico { animation: iklRing 2.4s ease-out infinite; }
+  :root[data-skin=living] .ik-ai::before { animation: iklFloat 10s ease-in-out infinite alternate; }
+  :root[data-skin=living] .ik-ai::after { animation: iklFloat 12s ease-in-out infinite alternate-reverse; }
+  :root[data-skin=living] .ik-ai:not([hidden]) > :not(.ik-micbar) { animation: iklRise .42s var(--spring) both; }
+  :root[data-skin=living] .ik-micbar::before { animation: iklDome 4.4s ease-in-out infinite; }
+  :root[data-skin=living] .ik-msg { animation: iklRise .36s var(--spring) both; }
+  :root[data-skin=living] .ik-invite-mic { animation: iklBreathe 2.8s ease-in-out infinite; }
+  :root[data-skin=living] .ik-done-ico { animation: iklPop .6s var(--spring) both; }
+  :root[data-skin=living] .ik-done .ik-title { animation: iklRise .5s .12s var(--spring) both; }
+  :root[data-skin=living] .ik-done .ik-lead { animation: iklRise .5s .2s var(--spring) both; }
+}
+@media (prefers-reduced-motion: reduce) {
+  :root[data-skin=living] .ik-mic[aria-pressed="true"] { animation: none; }
+}
