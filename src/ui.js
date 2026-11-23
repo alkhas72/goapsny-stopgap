@@ -991,6 +991,20 @@ export function createUI(root, handlers) {
   }
   function exportNote(t) { const el = $("[data-export-note]"); el.textContent = t || ""; }
 
+  // Крупная цифра размера не перескакивает, а добегает до нового значения (живая оболочка)
+  function rollTitle(el, text) {
+    const nums = (text.match(/\d+/g) || []).map(Number), prev = st.headShown;   // старт — то, что сейчас на экране
+    cancelAnimationFrame(st.headRaf || 0);
+    const put = (vals) => { let i = 0; st.headShown = vals; el.innerHTML = esc(text.replace(/\d+/g, () => String(vals[i++]))) + "<small> мм</small>"; };
+    if (!prev || prev.length !== nums.length || mqReduce.matches || prev.every((v, i) => v === nums[i])) return put(nums);
+    const t0 = performance.now(), D = 420;
+    const step = (now) => {
+      const k = Math.min(1, (now - t0) / D), e = 1 - Math.pow(1 - k, 3);
+      put(nums.map((n, i) => Math.round(prev[i] + (n - prev[i]) * e)));
+      if (k < 1) st.headRaf = requestAnimationFrame(step);
+    };
+    st.headRaf = requestAnimationFrame(step);
+  }
   function render(m) {
     if (!m) return;
     const prev = st.model;
@@ -1003,7 +1017,7 @@ export function createUI(root, handlers) {
     $("[data-sub]").textContent = sk ? `А ${num(p.hl)} · Б ${num(p.hr)} · перекос ${num(diff)} мм` : `ровный ${num(p.hl)} мм`;
     // шапка шторки
     const headT = `${num(d.ply.width)} × ${d.totalLen}`;
-    if (LIVING) { const ht = $("[data-head-title]"); ht.innerHTML = `${esc(headT)}<small> мм</small>`; ht.style.setProperty("--len", headT.length + 2); }
+    if (LIVING) { const ht = $("[data-head-title]"); ht.style.setProperty("--len", headT.length + 2); rollTitle(ht, headT); }
     else $("[data-head-title]").textContent = `${headT} мм`;
     const errs = m.issues.filter((x) => x.level === "error").length, warns = m.issues.length - errs;
     const stt = errs ? ["err", "Есть ошибка в замере"] : warns ? ["warn", "Замер неполный"] : ["ok", "Замер полный"];

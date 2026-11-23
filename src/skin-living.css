@@ -457,7 +457,7 @@
 :root[data-skin=living] .head-cap { grid-area: cap; color: inherit; opacity: .9; white-space: nowrap; }
 :root[data-skin=living] .ui-head .t-title3 {
   grid-area: title; font-size: min(46px, calc((100cqw - 104px) / (var(--len, 11) * .5))); line-height: 1; font-weight: 300;
-  letter-spacing: -.04em; white-space: nowrap;
+  letter-spacing: -.04em; white-space: nowrap; font-variant-numeric: lining-nums tabular-nums;
 }
 :root[data-skin=living] .ui-head .t-title3 small { font-size: .36em; font-weight: 400; letter-spacing: 0; opacity: .82; }
 :root[data-skin=living] .status {
@@ -623,11 +623,11 @@
 /* ================= 6. ДВИЖЕНИЕ ================= */
 /* смена настроения: новый цвет расходится кругом от нажатой кнопки (src/mood.js) */
 :root[data-skin=living].mood-wave, :root[data-skin=living].mood-wave * { transition: none !important; }
-:root[data-skin=living]::view-transition-old(root) { animation: none; }
-:root[data-skin=living]::view-transition-new(root) { animation: lvWave .7s cubic-bezier(.3, 0, .2, 1) both; }
+:root[data-skin=living]::view-transition-old(root) { animation: none; mix-blend-mode: normal; }
+:root[data-skin=living]::view-transition-new(root) { animation: lvWave .7s cubic-bezier(.3, 0, .2, 1) both; mix-blend-mode: normal; }
 @keyframes lvWave {
   from { clip-path: circle(0 at var(--vx, 86%) var(--vy, 56px)); }
-  to { clip-path: circle(150vmax at var(--vx, 86%) var(--vy, 56px)); }
+  to { clip-path: circle(var(--vr, 150vmax) at var(--vx, 86%) var(--vy, 56px)); }
 }
 @keyframes lvRise { from { opacity: 0; transform: scale(.97) translateY(14px); } }
 @keyframes lvPop { from { opacity: 0; transform: scale(.86); } }
