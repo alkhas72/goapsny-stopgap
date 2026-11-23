@@ -1,12 +1,16 @@
 import { build, validate, DEFAULTS, MAX_H, PLY, RIB_OVER, PARAMS_VERSION } from "./ramp.js";
 import { createPaints } from "./paints.js";
 import { createPdf } from "./pdf.js";
+import { createRampsSource } from "./ramps-source.js";
+import { createRampLayers } from "./ramps-layer.js";
 // «Новый замер»: пошаговая анкета замерщика (заявка на пандус) с фото или видео и помощником Claude.
 // createIntake() без DOM отдаёт чистые функции (их проверяет tests/intake.test.mjs),
 // createIntake().mount(root, handlers) строит мастер поверх конструктора; 3D остаётся прежней сценой.
 // Помощник — возможность sample (window.claude.use), заявки — db, личность — user, файл — downloads.
 // Каждая возможность может прийти null: мастер работает и без них. Единственное объявление верхнего уровня.
 export function createIntake() {
+  // точка объекта на карте: проверка координат — как у карты пандусов (src/ramps-source.js), движок карты — src/ramps-layer.js
+  const GEO = createRampsSource({ fetch: null, storage: null, search: "" }), GEOMAP = createRampLayers();
   // ---------- все тексты для людей: правятся здесь ----------
   const T = {
     entry: "Новый замер",
@@ -54,6 +58,15 @@ export function createIntake() {
     fields: {
       role: "Кто вы", roleOther: "Кто именно", name: "Имя и фамилия", contact: "Телефон или другой контакт",
       object: "Учреждение или объект", address: "Адрес", entrance: "Какой вход", comment: "Комментарий",
+    },
+    geo: {
+      label: "Точка на карте", none: "не отмечена",
+      hint: "Нажмите на карту там, где вход. Точку можно двигать. С ней заявка появится на карте пандусов.",
+      wait: "Загружаю карту…", fail: "Карта не загрузилась. Точку можно поставить кнопкой «Где я».",
+      me: "Где я", clear: "Убрать точку", locating: "Определяю место…",
+      gps: (acc) => (acc != null ? `Точка по геолокации, точность около ${acc} м. Поправьте её на карте, если вход в стороне.` : "Точка по геолокации. Поправьте её на карте, если вход в стороне."),
+      geoNone: "Геолокация здесь недоступна.", geoDenied: "Нет доступа к геолокации.", geoFail: "Не удалось определить место.",
+      zoomIn: "Приблизить", zoomOut: "Отдалить", sum: "Точка на карте",
     },
     ph: {
       roleOther: "например, родственник", name: "Как к вам обращаться", contact: "+7 940 …, Telegram, почта",
@@ -103,7 +116,7 @@ export function createIntake() {
       localText: (id) => `Номер: ${id}. Скачайте файл заявки и передайте его в АИС.`,
       why: { nodb: "Хранилище заявок здесь недоступно.", noid: "Не удалось узнать вашу учётную запись: войдите в Claude, чтобы отправлять заявки.", timeout: "Хранилище не ответило за 10 секунд.", error: "Хранилище отклонило заявку." },
       download: "Скачать заявку PDF", making: "Готовлю PDF…", pdfFail: "PDF не собрался: нет связи с сервером библиотеки. Попробуйте ещё раз.", downloaded: "Файл заявки сохранён.", declined: "Сохранение отменено.", noDownload: "Скачивание здесь недоступно.",
-      again: "Новый замер", toApp: "К конструктору",
+      again: "Новый замер", toApp: "К конструктору", backToMap: "Вернуться на карту",
     },
     paint: {
       title: "Покраска OSOKA", aria: "Цвет покраски", row: "Покраска",
@@ -243,16 +256,41 @@ export function createIntake() {
     return Array.from({ length: k }, (_, i) => Math.min(end, ms((i + 0.5) * duration / k)));
   }
 
+  // uuid заявки (в плане данных GoApsny request_id — uuid); короткий номер r… остаётся для людей
+  function newUuid() {
+    try { if (typeof crypto !== "undefined" && crypto.randomUUID) return crypto.randomUUID(); } catch {}
+    const b = new Uint8Array(16);
+    try { crypto.getRandomValues(b); } catch { for (let i = 0; i < 16; i++) b[i] = Math.floor(Math.random() * 256); }
+    b[6] = (b[6] & 0x0f) | 0x40; b[8] = (b[8] & 0x3f) | 0x80;
+    const h = Array.from(b, (x) => x.toString(16).padStart(2, "0")).join("");
+    return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
+  }
   function newId(now = Date.now(), rnd = Math.random) {
     return "r" + now.toString(36) + Math.floor(rnd() * 36 ** 4).toString(36).padStart(4, "0");
   }
   function emptyDraft(now = new Date()) {
     return {
-      v: 2, id: newId(now.getTime()), createdAt: now.toISOString(), updatedAt: now.toISOString(), step: 0, maxStep: 0, mode: "photo",
+      v: 2, id: newId(now.getTime()), uuid: newUuid(), createdAt: now.toISOString(), updatedAt: now.toISOString(), step: 0, maxStep: 0, mode: "photo",
       role: "", roleOther: "", name: "", contact: "", object: "", address: "", entrance: "",
       free: "", width: "", hl: "", hr: "", comment: "", extraNote: "",
+      geo: null, placeId: null, returnUrl: null,       // точка объекта, место из GoApsny и куда вернуться после заявки
       media: { hl: [], hr: [], free: [], overview: [], extra: [], fit: [] }, chat: [], sent: null,
     };
+  }
+  // Предзаполнение с карты: open({ place: { place_id, name, address, entrance, lat, lng }, returnUrl }).
+  // Меняет только поля места в черновике; пустые значения ничего не затирают. Возвращает тот же черновик
+  function applyPrefill(d, prefill) {
+    const p = prefill && prefill.place;
+    if (p && typeof p === "object") {
+      const g = GEO.geoPoint({ lat: p.lat, lng: p.lng, src: "tap" });
+      if (typeof p.name === "string" && p.name.trim()) d.object = clip(p.name, 300);
+      if (typeof p.address === "string" && p.address.trim()) d.address = clip(p.address, 400);
+      if (typeof p.entrance === "string" && p.entrance.trim()) d.entrance = clip(p.entrance, 200);
+      if (g) d.geo = g;
+      d.placeId = GEO.uuidOr(p.place_id);
+    }
+    if (prefill && typeof prefill.returnUrl === "string") d.returnUrl = GEO.safeReturn(prefill.returnUrl, typeof location !== "undefined" ? location.origin : null);
+    return d;
   }
   const hasData = (d) => !!d && !d.sent && !!(d.role || d.name || d.object || d.address || d.free || d.hl || d.hr || MEDIA_STEPS.some((s) => d.media?.[s]?.length));
 
@@ -323,13 +361,14 @@ export function createIntake() {
   }
   // Заявка: всё, что ушло в хранилище или в файл. Числа расчёта — только из build().dims
   function buildRequest(d, model, { now = new Date(), photos = [], paint = null } = {}) {
-    const v = values(d), dm = model.dims, p = model.params;
+    const v = values(d), dm = model.dims, p = model.params, geo = GEO.geoPoint(d.geo);
     return {
       v: 1, type: "ramp-request", app: "goapsny-stopgap", paramsVersion: PARAMS_VERSION,
-      id: d.id, createdAt: d.createdAt, submittedAt: now.toISOString(),
+      id: d.id, uuid: d.uuid || newUuid(), createdAt: d.createdAt, submittedAt: now.toISOString(),
       role: d.role, roleText: roleText(d),
       measurer: { name: clip(d.name, 200), contact: clip(d.contact, 200) },
-      object: { name: clip(d.object, 300), address: clip(d.address, 400), entrance: clip(d.entrance, 200) },
+      // place_id — uuid места из GoApsny, если замер начат с его карты; geo — точка входа, если отмечена
+      object: { name: clip(d.object, 300), address: clip(d.address, 400), entrance: clip(d.entrance, 200), place_id: GEO.uuidOr(d.placeId), ...(geo ? { geo } : {}) },
       measure: { freeWidth: v.freeWidth, width: v.width, hl: v.hl, hr: v.hr, raw: { freeWidth: d.free.trim(), width: d.width.trim(), hl: d.hl.trim(), hr: d.hr.trim() } },
       params: { hl: p.hl, hr: p.hr, width: p.width, board: p.board, freeWidth: p.freeWidth },
       paint: paint ? { hex: paint.hex ?? null, ral: paint.ral || "", name: paint.name || "" } : { hex: null, ral: PAINTS.RAW.ral, name: PAINTS.RAW.name },
@@ -485,6 +524,8 @@ export function createIntake() {
     let d = null;
     try { d = JSON.parse(localStorage.getItem(DRAFT_KEY) || "null"); } catch { d = null; }
     if (!d || d.v !== 2) d = emptyDraft();
+    if (!d.uuid) d.uuid = newUuid();              // черновики до появления uuid
+    d.geo = GEO.geoPoint(d.geo); d.placeId = GEO.uuidOr(d.placeId); d.returnUrl = typeof d.returnUrl === "string" ? d.returnUrl : null;
     d.media = { hl: [], hr: [], free: [], overview: [], extra: [], fit: [], ...(d.media || {}) };
     d.mode = "photo";                            // видео пока не обрабатываем (Алхас, 2026-11-08)
     if (typeof d.extraNote !== "string") d.extraNote = "";
@@ -774,6 +815,66 @@ export function createIntake() {
     }
     const banner = (lvl, text) => `<div class="banner banner-${lvl}" role="${lvl === "err" ? "alert" : "status"}">${icon(lvl === "err" ? "error" : lvl === "warn" ? "warn" : "ok", "b-ico")}<span>${esc(text)}</span></div>`;
 
+    // ---------- точка объекта на карте (шаг «Объект»): необязательная, шаги не держит ----------
+    const geoIco = {
+      me: '<path d="M20.2 3.8 3.9 10.5l6.8 2.8 2.8 6.8z" style="fill:none;stroke:currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>',
+      plus: '<path d="M12 5.5v13M5.5 12h13" style="fill:none;stroke:currentColor" stroke-width="2.2" stroke-linecap="round"/>',
+      minus: '<path d="M5.5 12h13" style="fill:none;stroke:currentColor" stroke-width="2.2" stroke-linecap="round"/>',
+    };
+    const gIcon = (n) => `<svg class="ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false">${geoIco[n]}</svg>`;
+    const geoVal = () => GEO.fmtCoord(GEO.geoPoint(d.geo)) || T.geo.none;
+    function geoHTML() {
+      const G = T.geo, has = !!GEO.geoPoint(d.geo);
+      return `<div class="group group-gap"><div class="gm-geo" data-ik-geo>
+        <div class="gm-geo-head"><span class="ik-text-l gm-geo-l">${esc(G.label)}<span class="row-sub"> · ${esc(T.optional)}</span></span><span class="gm-geo-val" data-ik-geo-val>${esc(geoVal())}</span></div>
+        <div class="gm-geo-map" data-ik-geo-map><p class="gm-geo-wait" data-ik-geo-wait>${esc(G.wait)}</p></div>
+        <div class="gm-geo-acts">
+          <button type="button" class="btn-plain" data-ik-geo-me>${gIcon("me")}<span>${esc(G.me)}</span></button>
+          <button type="button" class="btn-plain" data-ik-geo-clear ${has ? "" : "hidden"}><span>${esc(G.clear)}</span></button>
+        </div>
+        <p class="gm-geo-note" data-ik-geo-note role="status">${esc(st.geoNote || G.hint)}</p>
+      </div></div>`;
+    }
+    let geoView = null, geoSeq = 0;
+    function geoStop() { geoSeq++; if (geoView) { try { geoView.destroy(); } catch {} geoView = null; } }
+    function geoPaint(note) {
+      const v = $("[data-ik-geo-val]", body), c = $("[data-ik-geo-clear]", body), n = $("[data-ik-geo-note]", body);
+      if (v) v.textContent = geoVal();
+      if (c) c.hidden = !GEO.geoPoint(d.geo);
+      if (n && note !== undefined) { st.geoNote = note; n.textContent = note || T.geo.hint; }
+    }
+    function geoSet(g, note = "") {
+      d.geo = g ? GEO.geoPoint(g) : null; save();
+      if (geoView) geoView.placePoint(d.geo, { pan: !!(g && g.src === "gps") });
+      geoPaint(note);
+    }
+    function geoStart() {
+      const el = $("[data-ik-geo-map]", body); if (!el) return;
+      const seq = ++geoSeq, g = GEO.geoPoint(d.geo);
+      const night = doc.documentElement.dataset.mood === "night" || doc.documentElement.dataset.theme === "dark";
+      GEOMAP.createView(el, {
+        center: g ? [g.lat, g.lng] : GEO.CENTER, zoom: g ? 17 : 13, wheel: false, night, base: GEOMAP.baseKey(GEOMAP.savedBase()),
+        onPlace: (p) => geoSet({ ...p, src: "tap" }),
+      }).then((view) => {
+        if (seq !== geoSeq || !el.isConnected) { try { view.destroy(); } catch {} return; }
+        geoView = view;
+        $("[data-ik-geo-wait]", el)?.remove();
+        const z = doc.createElement("div"); z.className = "gm-geo-zoom";
+        z.innerHTML = `<button type="button" data-ik-geo-zoom="1" aria-label="${esc(T.geo.zoomIn)}">${gIcon("plus")}</button><button type="button" data-ik-geo-zoom="-1" aria-label="${esc(T.geo.zoomOut)}">${gIcon("minus")}</button>`;
+        el.appendChild(z);
+        if (g) view.placePoint(g);
+      }).catch(() => { if (seq === geoSeq) { const w = $("[data-ik-geo-wait]", el); if (w) w.textContent = T.geo.fail; } });
+    }
+    function geoLocate() {
+      if (!navigator.geolocation) return geoPaint(T.geo.geoNone);
+      geoPaint(T.geo.locating);
+      navigator.geolocation.getCurrentPosition((p) => {
+        const g = GEO.geoPoint({ lat: p.coords.latitude, lng: p.coords.longitude, src: "gps", acc: p.coords.accuracy });
+        if (!g) return geoPaint(T.geo.geoFail);
+        geoSet(g, T.geo.gps(g.acc ?? null));
+      }, (e) => geoPaint(e && e.code === 1 ? T.geo.geoDenied : T.geo.geoFail), { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 });
+    }
+
     function stepHTML(id) {
       const S = T.steps[id], v = values(d);
       let o = `<h2 class="ik-title" tabindex="-1" data-ik-h>${esc(S.title)}</h2>${S.lead ? `<p class="ik-lead">${esc(S.lead)}</p>` : ""}`;
@@ -782,7 +883,8 @@ export function createIntake() {
           T.roles.map((r) => `<button type="button" class="row ik-role" role="radio" aria-checked="${d.role === r.v}" data-ik-role="${r.v}"><span>${esc(r.t)}</span>${icon("check", "ik-ck")}</button>`).join("") + `</div>` +
           (d.role === "other" ? `<div class="group group-gap">${textRow("roleOther", true)}</div>` : "") +
           `<div class="group group-gap">${textRow("name", false, 'autocomplete="name"')}${textRow("contact", true, 'inputmode="text" autocomplete="tel"')}</div>` +
-          `<div class="group group-gap">${textRow("object", false)}${textRow("address", false, 'autocomplete="street-address"')}${textRow("entrance", true)}</div>`;
+          `<div class="group group-gap">${textRow("object", false)}${textRow("address", false, 'autocomplete="street-address"')}${textRow("entrance", true)}</div>` +
+          geoHTML();
       } else if (id === "overview") {
         o += mediaHTML(id);
       } else if (id === "extra") {
@@ -831,7 +933,7 @@ export function createIntake() {
       const grp = (title, step, rows) => `<div class="ik-sum-h"><span>${esc(title)}</span><button type="button" class="ik-edit" data-ik-goto="${STEPS.indexOf(step)}">${esc(S.edit)}</button></div>` +
         `<div class="group">${rows.filter(Boolean).map(([k, val]) => `<div class="row row-kv"><span>${esc(k)}</span><span class="kv-v c2">${esc(val || "—")}</span></div>`).join("")}</div>`;
       return grp(S.who, "who", [[T.fields.role, roleText(d)], [T.fields.name, d.name.trim()], [T.fields.contact, d.contact.trim()]]) +
-        grp(S.obj, "who", [[T.fields.object, d.object.trim()], [T.fields.address, d.address.trim()], [T.fields.entrance, d.entrance.trim()]]) +
+        grp(S.obj, "who", [[T.fields.object, d.object.trim()], [T.fields.address, d.address.trim()], [T.fields.entrance, d.entrance.trim()], GEO.geoPoint(d.geo) ? [T.geo.sum, GEO.fmtCoord(GEO.geoPoint(d.geo))] : null]) +
         grp(T.paint.row, "fit", [[T.paint.row, (() => { const r = paintRecord(curPaint(), paints); return r.hex ? [r.ral, r.name].filter(Boolean).join(" · ") : T.paint.rawName; })()]]) +
         grp(S.measure, "free", [[T.steps.free.label, v.freeWidth != null ? `${d.free.trim()} мм` : ""], [T.steps.width.label, v.width != null ? `${num(v.width)} мм` : ""], [T.steps.hl.label, v.hl != null ? `${d.hl.trim()} мм` : ""], [T.steps.hr.label, v.hr != null ? `${d.hr.trim()} мм` : ""], [S.photos, String(all.length)]]) +
         (() => {
@@ -854,6 +956,9 @@ export function createIntake() {
       if (ok && s.photoCount && s.photosStored < s.photoCount) o += `<p class="ik-lead c2">${esc(s.photosStored ? S.photosSaved(s.photosStored, s.photoCount) : S.photosLocal)}</p>`;
       o += `</div><div class="group group-gap"><button type="button" class="row row-action ik-dl" data-ik-dl>${icon("download")}<span>${esc(S.download)}</span></button></div>` +
         `<p class="ik-send-note" data-ik-dl-note role="status"></p>`;
+      // замер начат с карты доступности: обычная ссылка обратно, без автоперехода (адрес проверен в applyPrefill)
+      const back = GEO.safeReturn(d.returnUrl, location.origin);
+      if (back) o += `<div class="group group-gap"><a class="row row-action ik-dl ik-back-map" href="${esc(back)}" rel="noopener">${icon("back")}<span>${esc(S.backToMap)}</span></a></div>`;
       return o;
     }
 
@@ -895,7 +1000,9 @@ export function createIntake() {
       $$("input[data-num]", body).forEach(fitInput);
     }
     function renderBody(focus) {
+      geoStop();
       body.innerHTML = st.view === "resume" ? resumeHTML() : st.view === "done" ? doneHTML() : stepHTML(curStep());
+      if (st.open && st.view === "step" && curStep() === "who") geoStart();
       const peek = st.view === "step" && (curStep() === "check" || curStep() === "fit");
       box.classList.toggle("ik-peek", peek);
       root.classList.toggle("ik-peek-on", st.open && peek);
@@ -1208,7 +1315,8 @@ export function createIntake() {
     async function reset() {
       for (const id of [...media.keys()]) removeMedia(id);
       await idb.clear();
-      d = emptyDraft(); st.lastApplied = ""; st.lastRequest = null; logEl.replaceChildren();
+      d = emptyDraft(); st.lastApplied = ""; st.lastRequest = null; st.geoNote = ""; logEl.replaceChildren();
+      if (st.prefill) { applyPrefill(d, st.prefill); st.prefill = null; }     // «Начать заново» после входа с карты: место подставляется
       saveNow();
     }
 
@@ -1230,11 +1338,27 @@ export function createIntake() {
       }
       go(d.step + 1);
     }
-    function open() {
-      if (st.open) return;
+    // open(prefill): prefill = { place: { place_id, name, address, entrance, lat, lng }, returnUrl } — замер с карты.
+    // Пустой черновик сразу начинается с этим местом. Если есть начатый черновик, мастер спросит, продолжить его
+    // или начать заново: место подставится при «Начать заново». Без prefill поведение прежнее.
+    function open(prefill) {
+      if (st.open || st.opening) return;
+      const pre = prefill && typeof prefill === "object" && (prefill.place || prefill.returnUrl) ? prefill : null;
+      let fresh = false;                           // место только что подставлено: сразу к шагам, без вопроса
+      if (pre && d.sent) {                         // прошлая заявка уже отправлена: новый замер начинается сразу
+        st.prefill = pre; st.opening = true;
+        reset().catch(() => {}).then(() => { st.opening = false; show(true); });
+        return;
+      }
+      if (pre && !hasData(d)) { applyPrefill(d, pre); saveNow(); fresh = true; }
+      else if (pre && d.placeId && d.placeId === GEO.uuidOr(pre.place && pre.place.place_id)) applyPrefill(d, { returnUrl: pre.returnUrl });
+      else st.prefill = pre;
+      show(fresh);
+    }
+    function show(fresh) {
       st.open = true; st.opener = doc.activeElement;
       box.hidden = false; root.classList.add("is-intake");
-      st.view = d.sent ? "done" : hasData(d) ? "resume" : "step";
+      st.view = d.sent ? "done" : hasData(d) && !fresh ? "resume" : "step";
       if (st.view === "step") applyParams();
       render(true);
       if (st.sample === undefined) initAI();
@@ -1245,7 +1369,7 @@ export function createIntake() {
       if (st.ctl) st.ctl.abort();
       try { rec?.abort(); } catch {}
       st.listening = false; st.aiOpen = false;
-      st.open = false; box.hidden = true;
+      st.open = false; box.hidden = true; geoStop(); st.prefill = null;
       root.classList.remove("is-intake", "ik-peek-on");
       saveNow();
       if (typeof h.onClose === "function") h.onClose();
@@ -1285,6 +1409,9 @@ export function createIntake() {
       if (b.matches("[data-ik-dl]")) return download();
       if (b.matches("[data-ik-ar]")) return openAR();
       if (b.dataset.ikPaint != null) return setPaint(b.dataset.ikPaint || null);
+      if (b.matches("[data-ik-geo-me]")) return geoLocate();
+      if (b.matches("[data-ik-geo-clear]")) return geoSet(null, "");
+      if (b.dataset.ikGeoZoom) { if (geoView) geoView.zoomBy(+b.dataset.ikGeoZoom); return; }
     });
     body.addEventListener("input", (e) => {
       const t = e.target, f = t.dataset?.f; if (!f) return;
@@ -1341,7 +1468,7 @@ export function createIntake() {
 
   return {
     T, STEPS, MEDIA_STEPS, PHOTO_REQUIRED, maxPhotos, DB_PHOTO_PLAN, PHOTO_DOC_MAX, DOC_LIMIT,
-    parseNum, spokenNumber, userNotes, fitSize, frameCount, frameTimes, defaultWidth, newId, emptyDraft, hasData, values, draftParams,
+    parseNum, spokenNumber, userNotes, fitSize, frameCount, frameTimes, defaultWidth, newId, newUuid, emptyDraft, applyPrefill, hasData, values, draftParams,
     AR_BASE, paintRecord, arUrl, arValues,
     stepCheck, firstBlocked, buildRequest, docBytes, parseSuggestions, visibleStream, buildPrompt, modelSummary, withTimeout,
     mount,

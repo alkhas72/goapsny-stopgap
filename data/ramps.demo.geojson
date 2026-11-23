@@ -1,0 +1,51 @@
+{
+  "type": "FeatureCollection",
+  "name": "goapsny-stopgap-ramps-demo",
+  "note": "Три примера для показа карты. Это не настоящие пандусы: места и размеры условные. Показываются, пока реестр data/ramps.geojson пуст.",
+  "features": [
+    {
+      "type": "Feature",
+      "geometry": { "type": "Point", "coordinates": [41.0190, 43.0033] },
+      "properties": {
+        "id": "demo-installed",
+        "name": "Пример: вход в школу",
+        "address": "Сухум, условный адрес",
+        "entrance": "главный",
+        "status": "installed",
+        "hl": 85, "hr": 70, "width": 900, "board": 40,
+        "paint_hex": "#102C54", "paint_ral": "RAL 5026", "paint_name": "Pearl Night Blue",
+        "measured_at": "2026-09-02", "ordered_at": "2026-09-04", "installed_at": "2026-10-12",
+        "note": "Пандус стоит: порог с перекосом, слева выше."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": { "type": "Point", "coordinates": [41.0262, 42.9996] },
+      "properties": {
+        "id": "demo-ordered",
+        "name": "Пример: поликлиника",
+        "address": "Сухум, условный адрес",
+        "entrance": "со двора",
+        "status": "ordered",
+        "hl": 98, "hr": 98, "width": 900, "free_width": 1100,
+        "paint_hex": "#D53032", "paint_ral": "RAL 3018", "paint_name": "Strawberry Red",
+        "measured_at": "2026-11-10", "ordered_at": "2026-11-12",
+        "note": "Заявка отправлена, пандус ещё не изготовлен."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": { "type": "Point", "coordinates": [41.0301, 43.0058] },
+      "properties": {
+        "id": "demo-measured",
+        "name": "Пример: библиотека",
+        "address": "Сухум, условный адрес",
+        "entrance": "главный",
+        "status": "measured",
+        "hl": 58, "hr": 58, "free_width": 1000,
+        "measured_at": "2026-11-19",
+        "note": "Сделан только замер порога."
+      }
+    }
+  ]
+}
