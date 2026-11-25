@@ -2,6 +2,8 @@
 <html lang="ru">
 <head>
 <meta charset="utf-8">
+<!-- Приложение может жить в папке (например /zamer/ внутри карты): все адреса относительные. Адрес папки без косой черты в конце ломает их, поэтому её добавляем. Одной строкой: сборка одним файлом (scripts/build-artifact.mjs) этот блок не берёт. -->
+<script>(function () { try { var p = location.pathname; if (!/(\/|\.html?|\/index)$/.test(p)) location.replace(p + "/" + location.search + location.hash); } catch (e) {} })();</script>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
 <meta name="theme-color" content="#F2F2F7" media="(prefers-color-scheme: light)">
@@ -15,6 +17,7 @@
 <link rel="stylesheet" href="src/skin-living.css">
 <link rel="stylesheet" href="src/skin-living-intake.css">
 <link rel="stylesheet" href="src/map.css">
+<link rel="stylesheet" href="src/howto.css">
 <link rel="stylesheet" href="src/shell.css">
 <script>
 // Оболочка приложения. По умолчанию — «живая» (по эталону «Суфлёр АИС»): data-skin=living и одно из четырёх настроений.

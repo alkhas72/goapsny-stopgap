@@ -21,6 +21,10 @@ export function createAR() {
     step: "Точка примыкания",
     a: "А", b: "Б", width: "Ширина", length: "Длина", mm: "мм",
     alt: "3D-модель пандуса",
+    // подсказка жестов (Алхас, 2026-11-25): без неё пандус выглядит картинкой; уходит с первым касанием модели
+    gesture: "Крутите пандус пальцем, двумя приближайте",
+    gestureMouse: "Крутите пандус мышью, колесом приближайте",
+    arMoves: "В AR пандус двигают по земле одним пальцем, поворачивают двумя.",
     color: "Цвет", raw: "Без покраски", stencilNote: "Надпись goapsny.org наносится на окрашенный пандус.",
   };
   const MV_VERSION = "4.1.0";
@@ -237,6 +241,8 @@ export function createAR() {
 .sgar-x:focus-visible,.sgar-go:focus-visible{outline:3px solid var(--focus,#C9452F);outline-offset:2px}
 .sgar-stage{position:relative;flex:1;min-height:0}
 .sgar-stage model-viewer{width:100%;height:100%;display:block;background:var(--stage,radial-gradient(120% 90% at 50% 35%,#fff 0%,#ECEDF2 55%,#DADCE3 100%));--poster-color:transparent}
+.sgar-gest{position:absolute;left:50%;bottom:14px;transform:translateX(-50%);margin:0;padding:8px 16px;width:max-content;max-width:calc(100% - 28px);border-radius:22px;background:rgba(22,24,23,.8);color:#fff;font:500 13.5px/18px var(--font,system-ui,sans-serif);text-align:center;pointer-events:none;-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);transition:opacity .35s,transform .35s}
+.sgar-gest.is-out{opacity:0;transform:translateX(-50%) translateY(8px)}
 .sgar-msg{position:absolute;inset:0;display:grid;place-items:center;padding:24px;text-align:center;color:var(--label-2,#6C6C70);font-weight:500}
 .sgar-hs{border:0;padding:3px 8px;border-radius:8px;background:rgba(22,39,58,.86);color:#fff;font:600 12px/1.2 var(--font,system-ui,sans-serif);white-space:nowrap;pointer-events:none;transform:translateY(-18px)}
 .sgar-hs.sgar-step{background:var(--tint,#EF705D);transform:translateY(14px)}
@@ -300,7 +306,9 @@ export function createAR() {
     };
     let url = glbUrl(cur);
     const paints = Array.isArray(opts.paints) ? opts.paints : null;
-    const pName = (hex) => { const q = paints && paints.find((x) => normPaint(x.hex) === hex); return q ? (q.hex ? `${q.ral} · ${q.name}` : q.ral) : hex || STR.raw; };
+    // человеку — только название цвета; марку краски и номер по вееру не показываем (Алхас, 2026-11-25)
+    const cap1 = (t) => (t ? t.charAt(0).toUpperCase() + t.slice(1) : "");
+    const pName = (hex) => { const q = paints && paints.find((x) => normPaint(x.hex) === hex); return q ? (q.hex ? cap1(q.ru || q.name) : STR.raw) : hex || STR.raw; };
     const sup = supported();
     const prevFocus = document.activeElement;
     const root = document.createElement("div");
@@ -314,8 +322,8 @@ export function createAR() {
       <div class="sgar-sheet">
         <dl class="sgar-dims">${cell(STR.a, p.hl)}${cell(STR.b, p.hr)}${cell(STR.width, p.width)}${cell(STR.length, d.totalLen)}</dl>
         ${paints ? `<div class="sgar-paint"><p class="sgar-pl" id="sgar-pl">${esc(STR.color)}: <b data-sgar-pn>${esc(pName(cur))}</b></p>
-          <div class="sgar-sw" role="group" aria-labelledby="sgar-pl">${paints.map((q) => `<button type="button" class="${q.hex ? "" : "sgar-raw"}" data-sgar-paint="${esc(q.hex || "")}" aria-pressed="${normPaint(q.hex) === cur}" aria-label="${esc(q.hex ? `${q.ral}, ${q.name}` : q.ral)}" style="--sw:${esc(q.hex || "transparent")}"><span></span></button>`).join("")}</div></div>` : ""}
-        <p class="sgar-hint">${esc(STR.instruction)}</p>
+          <div class="sgar-sw" role="group" aria-labelledby="sgar-pl">${paints.map((q) => `<button type="button" class="${q.hex ? "" : "sgar-raw"}" data-sgar-paint="${esc(q.hex || "")}" aria-pressed="${normPaint(q.hex) === cur}" aria-label="${esc(pName(normPaint(q.hex)))}" style="--sw:${esc(q.hex || "transparent")}"><span></span></button>`).join("")}</div></div>` : ""}
+        <p class="sgar-hint">${esc(STR.instruction)} ${esc(STR.arMoves)}</p>
         <button type="button" class="sgar-go" data-sgar-go disabled>${esc(STR.showAR)}</button>
         <p class="sgar-fb" data-sgar-fb role="status" hidden></p>
       </div>`;
@@ -369,7 +377,7 @@ export function createAR() {
       viewer = document.createElement("model-viewer");
       const attrs = {
         src: url, alt: STR.alt, ar: "", "ar-modes": "webxr scene-viewer quick-look", "ar-placement": "floor", "ar-scale": "fixed",
-        "camera-controls": "", "camera-target": "0m 0m 0m", "camera-orbit": "-28deg 68deg auto", "interaction-prompt": "none",
+        "camera-controls": "", "camera-target": "0m 0m 0m", "camera-orbit": "-28deg 68deg auto", "interaction-prompt": "auto", "interaction-prompt-threshold": "1200",
         "shadow-intensity": "1", "shadow-softness": "0.8", exposure: "1", "environment-image": "neutral", "touch-action": "none",
       };
       for (const [k, v] of Object.entries(attrs)) viewer.setAttribute(k, v);
@@ -380,6 +388,11 @@ export function createAR() {
         <div slot="ar-button" hidden></div><div slot="progress-bar"></div>`;
       viewer.addEventListener("load", () => {
         msg.remove();
+        const coarse = typeof matchMedia === "function" && matchMedia("(hover: none) and (pointer: coarse)").matches;
+        const gest = document.createElement("p"); gest.className = "sgar-gest"; gest.textContent = coarse ? STR.gesture : STR.gestureMouse;
+        $("[data-sgar-stage]").appendChild(gest);
+        const gone = () => { gest.classList.add("is-out"); setTimeout(() => gest.remove(), 400); viewer.removeEventListener("pointerdown", gone, true); viewer.removeEventListener("wheel", gone, true); };
+        viewer.addEventListener("pointerdown", gone, true); viewer.addEventListener("wheel", gone, { capture: true, passive: true });
         // canActivateAR выставляется асинхронно (проверка WebXR) — ждём до 2,5 с
         let tries = 0;
         const check = () => {

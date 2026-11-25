@@ -1,0 +1,72 @@
+/* Показ «Как мерить» (src/howto.js): сцена в виде рендера конструктора, под ней подпись шага и три числа заявки.
+   Цвета берёт у приложения (--cell, --label, --fill), студийный фон сцены свой: светлый и тёмный. */
+.hw {
+  --hw-coral: #ee6a4e; --hw-a: #fbfbfd; --hw-b: #dcdce2;
+  display: flex; flex-direction: column; gap: 12px; padding: 10px; color: var(--label);
+}
+:root[data-theme="dark"] .hw { --hw-a: #3a3a3f; --hw-b: #121214; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme]) .hw { --hw-a: #3a3a3f; --hw-b: #121214; } }
+.hw-segs { display: flex; gap: 5px; padding: 0 8px; margin-bottom: -8px; }
+.hw-segs button { flex: 1; height: 28px; padding: 12px 0; border: 0; background: none; cursor: pointer; border-radius: 6px; }
+.hw-segs i { display: block; height: 4px; border-radius: 2px; background: var(--fill); overflow: hidden; }
+.hw-segs b { display: block; height: 100%; width: 0; background: var(--label); border-radius: 2px; }
+.hw-segs button:focus-visible, .hw-ctl button:focus-visible, .hw-start:focus-visible { outline: 2px solid var(--hw-coral); outline-offset: 2px; }
+.hw-stage {
+  position: relative; border-radius: 22px; overflow: hidden; aspect-ratio: 1 / 1; width: 100%; max-height: 52vh; margin: 0 auto;
+  background: radial-gradient(130% 100% at 50% 8%, var(--hw-a) 0%, var(--hw-b) 100%);
+}
+.hw-stage canvas { position: absolute; inset: 0; display: block; width: 100%; height: 100%; }
+.hw-pill {
+  position: absolute; left: 0; top: 0; pointer-events: none; background: #ffffff; color: #1b2a41; border-radius: 999px;
+  padding: 5px 11px 6px; font: 600 15px/1 var(--font); letter-spacing: -.01em; font-variant-numeric: tabular-nums; white-space: nowrap;
+  box-shadow: 0 2px 10px rgba(27, 42, 65, .16); opacity: 0; will-change: transform, opacity;
+}
+.hw-pill b { color: var(--hw-coral); margin-right: 5px; }
+.hw-pill small { font-size: 11px; font-weight: 500; color: #6b7280; margin-left: 3px; }
+.hw-start {
+  position: absolute; left: 50%; top: 50%; width: 76px; height: 76px; margin: -38px 0 0 -38px; border: 0; border-radius: 50%;
+  display: grid; place-items: center; cursor: pointer; background: rgba(22, 24, 23, .82); color: #ffffff;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, .22); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); transition: transform .22s cubic-bezier(.34, 1.56, .64, 1);
+}
+.hw-start[hidden] { display: none; }
+.hw-start:active { transform: scale(.92); }
+.hw-start svg { width: 30px; height: 30px; margin-left: 4px; }
+.hw-cap { padding: 0 8px; min-height: 74px; }
+.hw-cap h3 { font-size: 24px; line-height: 29px; font-weight: 600; letter-spacing: -.02em; margin: 0 0 2px; }
+.hw-cap p { margin: 0; color: var(--label-2); font-size: 16px; line-height: 22px; text-wrap: balance; }
+.hw-nums { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; padding: 0 2px; }
+.hw-num { background: var(--fill); border-radius: 18px; padding: 10px 12px 9px; min-width: 0; transition: box-shadow .25s, background-color .25s; }
+.hw-num.is-on { background: var(--cell); box-shadow: 0 0 0 2.5px var(--hw-coral); }
+.hw-num span { display: block; font-size: 12.5px; line-height: 16px; color: var(--label-2); white-space: nowrap; }
+.hw-num strong { display: block; font-size: 30px; font-weight: 500; letter-spacing: -.03em; font-variant-numeric: tabular-nums; line-height: 1.1; white-space: nowrap; }
+.hw-num strong small { font-size: 12px; font-weight: 400; color: var(--label-2); letter-spacing: 0; margin-left: 4px; }
+.hw-num.is-empty strong { color: var(--label-3, var(--label-2)); }
+.hw-ctl { display: flex; justify-content: center; gap: 10px; padding-bottom: 4px; }
+.hw-ctl button { width: 52px; height: 44px; border-radius: 22px; border: 0; background: var(--fill); color: var(--label); cursor: pointer; display: grid; place-items: center; }
+.hw-ctl button.hw-play { width: 76px; background: var(--label); color: var(--cell); }
+.hw-ctl svg { width: 20px; height: 20px; }
+.hw-fail { position: absolute; inset: 0; display: grid; place-items: center; padding: 24px; text-align: center; color: #6b7280; }
+
+/* в листе конструктора: показ занимает ячейку целиком */
+.group.hw-host { overflow: hidden; }
+:root[data-skin=living] .hw-cap h3 { font-weight: 300; letter-spacing: -.035em; }
+:root[data-skin=living] .hw-num strong { font-weight: 300; }
+
+/* в мастере: показ поверх шага, как снимок крупно */
+.ik-how { position: absolute; inset: 0; z-index: 4; display: flex; flex-direction: column; background: var(--bg); }
+.ik-how[hidden] { display: none; }
+.ik-how-on .ik-foot { display: none; }
+.ik-how-head { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 12px 4px 20px; }
+.ik-how-head h2 { margin: 0; font-size: 22px; line-height: 28px; font-weight: 700; letter-spacing: -.01em; }
+:root[data-skin=living] .ik-how-head h2 { font-weight: 300; font-size: 26px; letter-spacing: -.04em; }
+.ik-how-sc { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 0 10px 16px; }
+.ik-how-sc .hw { background: var(--cell); border-radius: 28px; max-width: 460px; margin: 6px auto 0; }
+.ik-how-sc .hw-stage { max-height: 48vh; }
+
+/* строка-вход в показ на шаге «Замеры» */
+.ik-howbtn { display: flex; width: 100%; border: 0; font: inherit; color: inherit; text-align: left; gap: 12px; align-items: center; padding: 10px 14px 10px 10px; cursor: pointer; }
+.ik-howbtn-ico { flex: none; width: 44px; height: 44px; border-radius: 22px; background: var(--lime, var(--tint)); color: #161817; display: grid; place-items: center; }
+.ik-howbtn-ico svg { width: 18px; height: 18px; margin-left: 2px; }
+.ik-howbtn-t { flex: 1; min-width: 0; font-weight: 600; }
+.ik-howbtn-t span { display: block; font-weight: 400; font-size: 14px; line-height: 19px; color: var(--label-2); }
+.ik-howbtn:active .ik-howbtn-ico { transform: scale(.92); }

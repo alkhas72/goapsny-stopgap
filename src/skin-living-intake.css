@@ -87,6 +87,20 @@
 :root[data-skin=living] .ik-media .banner-in { margin-top: 12px; border-radius: var(--r-tile); }
 :root[data-skin=living] .ik-media-note { padding: 0 6px 10px; }
 
+/* шаг «Замеры» и строка «Где ещё нужен пандус»: обычные белые карточки, окно снимка маленькое */
+:root[data-skin=living] .group.ik-mrow { background: var(--cell); box-shadow: var(--card-shadow); border-radius: var(--r-card); overflow: hidden; }
+:root[data-skin=living] .ik-mshot { background: linear-gradient(120deg, var(--hero-a) 0%, var(--hero-b) 100%); color: var(--hero-ink); transition: transform .25s var(--spring); }
+:root[data-skin=living] .ik-mshot:not(:disabled):active, :root[data-skin=living] .ik-mbtn:not(:disabled):active { transform: scale(.92); }
+:root[data-skin=living] .ik-mshot-has { background: #0c0d0c; }
+:root[data-skin=living] .ik-mshot-add { background: var(--fill); color: var(--label); }
+:root[data-skin=living] .ik-mbtn { transition: transform .25s var(--spring); }
+:root[data-skin=living] .ik .ik-mnum .big-input, :root[data-skin=living] .ik .ik-mnum .big-input input { height: 52px; line-height: 52px; }
+:root[data-skin=living] .ik .ik-mnum .big-input input { font-size: 42px; }
+:root[data-skin=living] .ik .ik-mnum .big-input .unit { line-height: 52px; }
+:root[data-skin=living] .ik-mmore .ik-th { border-radius: 12px; }
+:root[data-skin=living] .ik-xt b { font-weight: 600; letter-spacing: -.01em; }
+:root[data-skin=living] .ik-howbtn { min-height: 64px; }
+
 /* число замера — герой шага */
 :root[data-skin=living] .ik .ik-num { padding-top: 14px; padding-bottom: 14px; }
 :root[data-skin=living] .ik .big-input { height: 60px; }

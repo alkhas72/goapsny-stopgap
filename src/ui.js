@@ -2,6 +2,7 @@ import { createDrawings } from "./drawings.js";
 import { createCutlist } from "./cutlist.js";
 import { createShare } from "./share.js";
 import { createPaints } from "./paints.js";
+import { createHowto } from "./howto.js";
 // Интерфейс конструктора в духе iOS: плавающее «стекло» над 3D, инспектор (компьютер) или шторка с тремя
 // положениями (телефон), сгруппированные списки, живая схема замера, чертёж боковины, рассказ «Сборка».
 // Все размеры берутся из model.dims и model.params (src/ramp.js); здесь они только выводятся и рисуются.
@@ -120,6 +121,7 @@ export function createUI(root, handlers) {
         </div>
       </div>
     </section>
+    <p class="ui-gest" data-gest hidden><span class="ui-gest-ico" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false" style="fill:none;stroke:currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 12a7.5 7.5 0 0 1 13-5.1M19.5 12a7.5 7.5 0 0 1-13 5.1"/><path d="M17.8 3.4v3.8H14M6.2 20.6v-3.8H10"/></svg></span><span data-gest-t></span></p>
     <div class="ui-stage" role="region" aria-label="3D-модель пандуса">${LIVING ? '<div class="stage-ambient" aria-hidden="true"><div class="stage-orb-glow glow-a"></div><div class="stage-orb-glow glow-b"></div></div>' : ""}</div>
   </div>
 
@@ -233,18 +235,18 @@ export function createUI(root, handlers) {
         </section>
 
         <section class="sec" aria-labelledby="h-paint">
-          <h2 class="sec-h" id="h-paint">Покраска OSOKA</h2>
+          <h2 class="sec-h" id="h-paint">Цвет</h2>
           <div class="group finish">
             <div class="finish-hero" data-finish-hero aria-hidden="true">
               <span class="finish-sheen"></span>
-              <span class="finish-meta"><span>OSOKA UR 305</span><span>2 слоя · ALSiUR</span></span>
+              <span class="finish-meta"><span>Краска в 2 слоя</span><span>против скольжения</span></span>
             </div>
             <div class="swatch-name" aria-live="polite"><span class="finish-name" data-paint-name></span><span class="finish-ral num-tab" data-paint-ral></span></div>
             <div class="swatches" role="radiogroup" aria-label="Цвет покраски" data-swatches>
               ${PAINTS.map((p, i) => `<button type="button" role="radio" aria-checked="false" tabindex="-1" class="swatch${p.hex ? "" : " swatch-raw"}" data-paint="${p.hex || ""}" data-i="${i}" aria-label="${esc(p.ral + (p.hex ? ", " + p.name : ""))}" style="--sw:${p.hex || "transparent"}"></button>`).join("")}
             </div>
           </div>
-          <p class="sec-f">Цвет на экране приблизительный. Финишный слой с наполнителем ALSiUR против скольжения.</p>
+          <p class="sec-f">Цвет на экране приблизительный. В финишном слое наполнитель против скольжения.</p>
         </section>
 
         <section class="sec" aria-labelledby="h-draw">
@@ -280,19 +282,9 @@ export function createUI(root, handlers) {
 
         <section class="sec" aria-labelledby="h-guide">
           <h2 class="sec-h" id="h-guide">Как мерить</h2>
-          <div class="group">
-            <div class="cell-schema" role="img" aria-label="Вид сверху: дверной проём с наличниками, свободная ширина между ними, пандус у ступени, точки А и Б на краях пандуса">${guideTopSVG()}</div>
-            <ol class="steps">
-              <li><span class="step-n" aria-hidden="true">1</span><span>Найдите, где пандус встанет к ступени напротив двери.</span></li>
-              <li><span class="step-n" aria-hidden="true">2</span><span>Измерьте <b>свободную ширину</b> в этом месте с учётом наличников и других выступов. Это обязательный замер.</span></li>
-              <li><span class="step-n" aria-hidden="true">3</span><span>Решите ширину пандуса: не больше свободной ширины, чтобы он встал вплотную.</span></li>
-              <li><span class="step-n" aria-hidden="true">4</span><span>Измерьте высоту ступени слева (А) и справа (Б) на краях будущего пандуса. При ширине 90 см между точками 90 см.</span></li>
-              <li><span class="step-n" aria-hidden="true">5</span><span>Введите обе высоты и ширину как есть, без округления.</span></li>
-            </ol>
-          </div>
+          <div class="group hw-host" data-howto></div>
           <div class="group group-gap">
-            <div class="cell-schema" role="img" aria-label="Вид спереди: земля под наклоном. Замер на полной ширине даёт настоящую разницу высот, замер на узкой базе 30–50 сантиметров — меньшую">${guideNarrowSVG()}</div>
-            <div class="banner banner-warn banner-in">${icon("warn", "b-ico")}<span>Не мерьте на узкой базе 30–50 см. Если земля наклонена, разница высот выйдет меньше настоящей, и пандус встанет с перекосом.</span></div>
+            <div class="banner banner-warn banner-in">${icon("warn", "b-ico")}<span>Высоты мерьте по краям будущего пандуса, не ближе друг к другу. Если земля наклонена, разница высот выйдет меньше настоящей, и пандус встанет с перекосом.</span></div>
           </div>
           <p class="sec-f">Двух высот у краёв для этой конструкции достаточно. Если свободная ширина не указана, замер считается неполным.</p>
         </section>
@@ -543,7 +535,8 @@ export function createUI(root, handlers) {
       b.setAttribute("aria-checked", on ? "true" : "false"); b.tabIndex = on ? 0 : -1;
     });
     $("[data-paint-ral]").textContent = info.hex ? `${info.ral} · ${info.hex}` : "фанера и сосна без покрытия";
-    $("[data-paint-name]").textContent = info.hex ? info.name : "Без покраски";
+    const ruName = info.ru || info.name || "";                 // название цвета по-русски, как в мастере и в примерке
+    $("[data-paint-name]").textContent = info.hex ? ruName.charAt(0).toUpperCase() + ruName.slice(1) : "Без покраски";
     const hero = $("[data-finish-hero]");
     hero.style.setProperty("--sw", info.hex || "#C9A46E");
     hero.classList.toggle("finish-raw", !info.hex);
@@ -662,46 +655,6 @@ export function createUI(root, handlers) {
       ` · настил ${d.ply.left || d.ply.length}${sk ? ` / ${d.ply.right}` : ""} · уклон ${slopeTxt(d.slope)} · доска ${num(m.params.board)}`;
   }
 
-  // ---------- схемы «Как мерить» (статичные) ----------
-  function guideTopSVG() {
-    return `<svg viewBox="0 0 340 236" width="100%" aria-hidden="true" focusable="false">
-      <rect x="0" y="0" width="340" height="44" style="fill:var(--sch-wall)"/>
-      <rect x="88" y="0" width="164" height="44" style="fill:var(--sch-open)"/>
-      <text x="170" y="14" text-anchor="middle" class="sch-t" style="fill:var(--sch-mut)">дверной проём</text>
-      <rect x="76" y="12" width="12" height="40" rx="2" style="fill:var(--sch-jamb)"/><rect x="252" y="12" width="12" height="40" rx="2" style="fill:var(--sch-jamb)"/>
-      <text x="70" y="30" text-anchor="end" class="sch-t" style="fill:var(--sch-mut)">наличник</text>
-      <g style="stroke:var(--tint-ink)" stroke-width="1.4"><line x1="90" y1="38" x2="250" y2="38"/><path d="M90 33v10M250 33v10"/></g>
-      <text x="170" y="31" text-anchor="middle" class="sch-t sch-b" style="fill:var(--tint-ink)">свободная ширина</text>
-      <rect x="96" y="44" width="148" height="122" rx="3" style="fill:var(--sch-ramp);stroke:var(--sch-ramp-edge)" stroke-width="1.6"/>
-      <text x="170" y="110" text-anchor="middle" class="sch-t sch-b" style="fill:var(--sch-ramp-ink)">пандус</text>
-      <circle cx="96" cy="44" r="10" style="fill:var(--navy-pt);stroke:var(--cell)" stroke-width="2"/><text x="96" y="48.5" text-anchor="middle" class="sch-pt">А</text>
-      <circle cx="244" cy="44" r="10" style="fill:var(--navy-pt);stroke:var(--cell)" stroke-width="2"/><text x="244" y="48.5" text-anchor="middle" class="sch-pt">Б</text>
-      <text x="84" y="72" text-anchor="end" class="sch-t" style="fill:var(--sch-ink)">высота А</text>
-      <text x="256" y="72" class="sch-t" style="fill:var(--sch-ink)">высота Б</text>
-      <g style="stroke:var(--sch-ink)" stroke-width="1.2"><line x1="96" y1="184" x2="244" y2="184"/><path d="M96 178v12M244 178v12"/></g>
-      <text x="170" y="206" text-anchor="middle" class="sch-t sch-b" style="fill:var(--sch-ink)">А–Б = ширина пандуса</text>
-      <text x="170" y="226" text-anchor="middle" class="sch-t" style="fill:var(--sch-mut)">при ширине 90 см точки в 90 см друг от друга</text>
-    </svg>`;
-  }
-  function guideNarrowSVG() {
-    // земля наклонена: z(x) = 120 - 0.1·x; ступень ровная на y = 34
-    const gy = (x) => 132 - (x - 20) * 0.11;
-    const bar = (x, cls, w) => `<line x1="${x}" y1="34" x2="${x}" y2="${gy(x).toFixed(1)}" style="stroke:${cls}" stroke-width="${w}" stroke-linecap="round"/>`;
-    return `<svg viewBox="0 0 340 196" width="100%" aria-hidden="true" focusable="false">
-      <rect x="20" y="22" width="300" height="12" rx="2" style="fill:var(--sch-wall)"/>
-      <text x="24" y="16" class="sch-t" style="fill:var(--sch-mut)">ступень ровная</text>
-      <path d="M20 ${gy(20)} L320 ${gy(320)} L320 150 L20 150 Z" style="fill:var(--sch-ground)"/>
-      <line x1="20" y1="${gy(20)}" x2="320" y2="${gy(320)}" style="stroke:var(--sch-ink)" stroke-width="1.6"/>
-      <text x="316" y="146" text-anchor="end" class="sch-t" style="fill:var(--sch-mut)">земля под наклоном</text>
-      ${bar(40, "var(--navy-pt)", 4)}${bar(300, "var(--navy-pt)", 4)}
-      <text x="48" y="96" class="sch-t sch-b" style="fill:var(--sch-ink)">А</text><text x="292" y="80" text-anchor="end" class="sch-t sch-b" style="fill:var(--sch-ink)">Б</text>
-      <g stroke-dasharray="4 3">${bar(130, "var(--red)", 2.4)}${bar(210, "var(--red)", 2.4)}</g>
-      <g style="stroke:var(--navy-pt)" stroke-width="1.2"><line x1="40" y1="166" x2="300" y2="166"/><path d="M40 161v10M300 161v10"/></g>
-      <text x="170" y="161" text-anchor="middle" class="sch-t sch-b" style="fill:var(--sch-ink)">90 см — верная разница</text>
-      <g style="stroke:var(--red)" stroke-width="1.2"><line x1="130" y1="184" x2="210" y2="184"/><path d="M130 179v10M210 179v10"/></g>
-      <text x="214" y="188" class="sch-t sch-b" style="fill:var(--red-ink)">40 см — меньше</text>
-    </svg>`;
-  }
 
   // ---------- рассказ «Сборка» ----------
   function storySteps() {
@@ -743,7 +696,7 @@ export function createUI(root, handlers) {
     } else if (id === "finish") {
       const pi = paintInfo();
       q = "Чем покрыт пандус?";
-      a = "Полиуретан OSOKA UR 305 в два слоя. В финишный слой добавлен наполнитель ALSiUR против скольжения, сверху — трафарет goapsny.org.";
+      a = "Полиуретановая краска в два слоя. В финишный слой добавлен наполнитель против скольжения, сверху — трафарет goapsny.org.";
       r("Цвет", pi.hex ? `${pi.ral} · ${pi.name}` : "без покраски"); r("Слоёв", "2");
       r("Против скольжения", "ALSiUR"); r("Трафарет", "goapsny.org");
     }
@@ -1154,6 +1107,43 @@ export function createUI(root, handlers) {
     setTimeout(() => root.classList.remove("intro"), 2600);
   }
   setTimeout(() => root.classList.add("intro-done"), 7000);
+  // «Как мерить» показом (src/howto.js): сцена ставится, когда раздел подходит к экрану, и стоит на последнем кадре до «Показать»
+  const howHost = $("[data-howto]");
+  if (howHost) {
+    const startHow = () => { if (!howHost.firstChild) createHowto().mount(howHost, { autoplay: false }); };
+    if (window.IntersectionObserver) {
+      const io = new IntersectionObserver((es) => { if (es.some((e) => e.isIntersecting)) { io.disconnect(); startHow(); } }, { root: null, rootMargin: "300px" });
+      io.observe(howHost);
+    } else startHow();
+  }
+
+  // Подсказка жестов у 3D (Алхас, 2026-11-25): без неё пандус выглядит картинкой, а не вещью, которую можно крутить.
+  // Видна, пока модель ни разу не тронули; после первого касания сцены уходит и больше не появляется
+  const GEST_KEY = "goapsny-stopgap:gest";
+  const gest = $("[data-gest]");
+  let gestSeen = false; try { gestSeen = localStorage.getItem(GEST_KEY) === "1"; } catch {}
+  if (gest && !gestSeen) {
+    const touch = matchMedia("(hover: none) and (pointer: coarse)").matches || mqPhone.matches;
+    $("[data-gest-t]").textContent = touch ? "Крутите пандус пальцем. Двумя пальцами приближайте и двигайте" : "Крутите пандус мышью. Колесо приближает, правая кнопка двигает";
+    gest.hidden = false;
+    // место: сразу над нижними кнопками модели; в мастере (шаг «Примерка») кнопок нет, подсказка лежит у нижнего края сцены
+    const viewEl = $(".ui-view"), bottomEl = $(".ui-bottom");
+    const place = () => {
+      const b = bottomEl.getBoundingClientRect(), v = viewEl.getBoundingClientRect();
+      gest.style.bottom = b.height > 0 && b.top < v.bottom ? `${Math.round(v.bottom - b.top + 10)}px` : "";
+    };
+    place();
+    const placeT = setInterval(place, 300);
+    const done = () => {
+      if (gest.classList.contains("is-out")) return;
+      clearInterval(placeT);
+      gest.classList.add("is-out"); setTimeout(() => { gest.hidden = true; }, 400);
+      try { localStorage.setItem(GEST_KEY, "1"); } catch {}
+      stageEl.removeEventListener("pointerdown", done, true); stageEl.removeEventListener("wheel", done, true);
+    };
+    stageEl.addEventListener("pointerdown", done, true); stageEl.addEventListener("wheel", done, { capture: true, passive: true });
+  }
+
   // после нажатия, а не на pointerdown: иначе подзаголовок исчезает до click и кнопка уезжает из-под пальца
   root.addEventListener("click", () => root.classList.add("intro-done"), { once: true });
 
