@@ -26,7 +26,13 @@
   try {
     var d = document.documentElement, q = new URLSearchParams(location.search);
     var ls = function (k) { try { return localStorage.getItem(k); } catch (e) { return null; } };
+    // Режим мастера (?mode=wizard): только «Новый замер», без конструктора и без three.js при старте.
+    // Так мастер открывается внутри карты GoApsny (?embed=1): лёгкий, один путь для человека.
+    var wizard = q.get("mode") === "wizard";
+    if (wizard) d.dataset.mode = "wizard";
+    if (q.get("embed") === "1") d.dataset.embed = "1";
     var skin = q.get("skin"); skin = skin === "violet" || skin === "classic" ? skin : "living";
+    if (wizard) skin = "living";
     if (skin === "classic") return;
     d.dataset.skin = skin;
     var tc = function (c) { document.querySelectorAll('meta[name="theme-color"]').forEach(function (m) { m.content = c; }); };
@@ -39,10 +45,13 @@
       return;
     }
     // настроение: мята (по умолчанию), орхидея, лайм, ночь; выбор хранится в браузере
-    var mood = ls("goapsny-stopgap:mood"); if (!/^(sage|orchid|lime|night)$/.test(mood)) mood = "sage";
+    // внутри карты настроение задаёт карта (?mood=), чтобы фон у мастера и у карты был один
+    var mood = (wizard && q.get("mood")) || ls("goapsny-stopgap:mood"); if (!/^(sage|orchid|lime|night)$/.test(mood)) mood = "sage";
     d.dataset.mood = mood; d.dataset.theme = mood === "night" ? "dark" : "light";
     tc({ sage: "#bedec9", orchid: "#f7cbe7", lime: "#f5f9ad", night: "#182620" }[mood]);
-    if (window.self !== window.top) {
+    if (wizard) {
+      // мастер занимает всё отведённое место: ни витрины, ни корпуса телефона
+    } else if (window.self !== window.top) {
       // приложение внутри витрины: корпус телефона или «во весь экран» — говорит родительская страница
       var ps = null; try { ps = window.parent.document.documentElement.dataset.shell; } catch (e) {}
       if (ps) d.dataset.framed = ps === "full" ? "full" : "phone";
@@ -54,8 +63,8 @@
   } catch (e) {}
 })();
 </script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/controls/OrbitControls.js"></script>
+<!-- three.js: конструктору его грузит src/boot.js до запуска приложения, здесь только ранний заказ файлов у сети. Мастеру (?mode=wizard) он нужен лишь для показа «Как мерить» и подгружается по его открытию (src/three-load.js). Одной строкой: сборка одним файлом этот блок не берёт. -->
+<script>(function () { var ds = document.documentElement.dataset; if (ds.mode === "wizard" || ds.shell) return; ["build/three.min.js", "examples/js/controls/OrbitControls.js"].forEach(function (f) { var l = document.createElement("link"); l.rel = "preload"; l.as = "script"; l.href = "https://cdn.jsdelivr.net/npm/three@0.147.0/" + f; document.head.appendChild(l); }); })();</script>
 </head>
 <body>
 <!-- BODY:START -->

@@ -914,6 +914,8 @@ g[data-part] { cursor: pointer; }
 .ik .ik-paint .swatches { padding-top: 12px; }
 .ik .ik-paint .swatch-name { padding-top: 12px; }
 .ik .ik-paint .finish-name { font-size: 20px; line-height: 26px; }
+/* режим мастера (без 3D-сцены): цвет показывает плитка */
+.ik .ik-paint .ik-hero { height: 128px; }
 .ik-ar-link { color: var(--tint-ink); word-break: break-all; }
 
 /* Окно съёмки (Алхас, 2026-11-08): фото — отправная точка замера, поле под снимок — главное на шаге */

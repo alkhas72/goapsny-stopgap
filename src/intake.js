@@ -500,6 +500,8 @@ export function createIntake() {
   // ======================================================================
   function mount(root, handlers) {
     const h = handlers || {};
+    // Режим мастера (без конструктора): выход ведёт на карту, а не в конструктор
+    if (h.exitTo === "map") { T.close = "На карту"; T.closeAria = "Закрыть замер и вернуться на карту. Черновик сохранится"; T.send.toApp = "На карту"; }
     const doc = document;
     const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
     const $ = (sel, el = box) => el.querySelector(sel);
@@ -746,6 +748,10 @@ export function createIntake() {
     // покраска живёт в конструкторе (state.paint): мастер только читает её и меняет тем же onPaint; цвета — из src/paints.js
     const paints = PAINTS.list();
     const curPaint = () => (typeof h.getPaint === "function" ? h.getPaint() : null) || null;
+    // 3D-сцена конструктора за листом «Примерки» есть только там, где мастер открыт из конструктора.
+    // В режиме мастера (src/wizard.js) сцены нет: шаг занимает весь экран, цвет показывает плитка.
+    const withScene = typeof h.getModel === "function";
+    const heroCls = (hex) => `finish-hero ik-hero${hex ? "" : " finish-raw"}`;
     // человеку — только название цвета по-русски (Алхас, 2026-11-25); марка краски и номер по вееру остаются в заявке для мастерской
     const cap1 = (t) => (t ? t.charAt(0).toUpperCase() + t.slice(1) : "");
     function paintLabel(hex) {
@@ -757,6 +763,7 @@ export function createIntake() {
       if (!paints.length) return "";
       const P = T.paint, r = paintRecord(curPaint(), paints);
       return `<div class="ik-sum-h"><span>${esc(P.title)}</span></div><div class="group finish ik-paint">
+        ${withScene ? "" : `<div class="${heroCls(r.hex)}" data-ik-hero aria-hidden="true" style="--sw:${r.hex || "#C9A46E"}"><span class="finish-sheen"></span></div>`}
         <div class="swatch-name" aria-live="polite"><span class="finish-name" data-ik-paint-name>${esc(paintLabel(curPaint()))}</span></div>
         <div class="swatches" role="radiogroup" aria-label="${esc(P.aria)}" data-ik-swatches>${paints.map((p) => {
           const on = (p.hex ? p.hex.toUpperCase() : null) === r.hex;
@@ -773,6 +780,8 @@ export function createIntake() {
       }
       const nm = $("[data-ik-paint-name]", body);
       if (nm) nm.textContent = paintLabel(curPaint());
+      const hero = $("[data-ik-hero]", body);
+      if (hero) { hero.className = heroCls(r.hex); hero.style.setProperty("--sw", r.hex || "#C9A46E"); }
     }
 
     // ---------- шаги: разметка ----------
@@ -1024,7 +1033,7 @@ export function createIntake() {
       geoStop(); closeHow();
       body.innerHTML = st.view === "resume" ? resumeHTML() : st.view === "done" ? doneHTML() : stepHTML(curStep());
       if (st.open && st.view === "step" && curStep() === "who") geoStart();
-      const peek = st.view === "step" && curStep() === "fit";
+      const peek = withScene && st.view === "step" && curStep() === "fit";
       box.classList.toggle("ik-peek", peek);
       root.classList.toggle("ik-peek-on", st.open && peek);
       body.scrollTop = 0;
@@ -1047,7 +1056,10 @@ export function createIntake() {
     function openHow() {
       const el = $("[data-ik-how]"); if (!el.hidden) return;
       el.hidden = false; box.classList.add("ik-how-on");
-      how = HOW.mount($("[data-ik-how-sc]"), { autoplay: true });
+      const start = () => { if (!el.hidden && !how) how = HOW.mount($("[data-ik-how-sc]"), { autoplay: true }); };
+      // В режиме мастера three.js при старте не грузится: показ подгружает его сам, один раз
+      if (typeof window !== "undefined" && !window.THREE && typeof h.loadThree === "function") Promise.resolve(h.loadThree()).then(start, start);
+      else start();
       $("[data-ik-how-close]").focus({ preventScroll: true });
     }
     function closeHow() {
