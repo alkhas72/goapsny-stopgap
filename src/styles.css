@@ -914,6 +914,8 @@ g[data-part] { cursor: pointer; }
 .ik .ik-paint .swatches { padding-top: 12px; }
 .ik .ik-paint .swatch-name { padding-top: 12px; }
 .ik .ik-paint .finish-name { font-size: 20px; line-height: 26px; }
+/* режим мастера (без 3D-сцены): цвет показывает плитка */
+.ik .ik-paint .ik-hero { height: 128px; }
 .ik-ar-link { color: var(--tint-ink); word-break: break-all; }
 
 /* Окно съёмки (Алхас, 2026-11-08): фото — отправная точка замера, поле под снимок — главное на шаге */
@@ -934,8 +936,17 @@ button.ik-shot:disabled { opacity: .5; cursor: default; }
 .ik-shot-has img { display: block; width: 100%; height: 100%; object-fit: contain; }
 .ik-thumbs-one { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .ik-thumbs { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+/* На телефоне окно съёмки берёт то, что осталось от экрана, чтобы «Галерея» под ним была видна без прокрутки
+   и на низком экране (390×664, iPhone в Safari). 448px: шапка мастера, заголовок шага с подсказкой, ряд «Галерея»,
+   полоса помощника и кнопки. Выше 46% экрана окно не растёт, ниже 150px не сжимается. */
 @media (max-width: 819.98px) {
-  .ik-shot { aspect-ratio: auto; height: 46vh; min-height: 260px; max-height: none; }
+  .ik-shot { aspect-ratio: auto; height: clamp(150px, calc(100vh - 448px), 46vh); min-height: 0; max-height: none; }
+  @supports (height: 100dvh) {
+    .ik-shot { height: clamp(150px, calc(100dvh - 448px), 46dvh); }
+  }
+}
+@media (max-width: 819.98px) and (max-height: 700px) {
+  .ik-shot:not(.ik-shot-has) { padding: 12px; }
 }
 
 /* Голос (Алхас, 2026-11-08): не полоса «Помощник», а кнопка микрофона между «Назад» и «Далее»;
@@ -990,3 +1001,55 @@ button.ik-shot-has { cursor: zoom-in; }
 @media (max-height: 700px) {
   .ik-shot-has { height: 24vh; min-height: 130px; }
 }
+
+/* Мастер в пять шагов (Алхас, 2026-11-25). Шаг «Замеры»: три замера на одном экране, у каждого слева
+   маленькое окно снимка рулетки, справа число. Такая же строка «Где ещё нужен пандус» под общим планом. */
+.group.ik-mrow { padding: 10px; }
+.ik-mtop { display: flex; align-items: center; gap: 12px; }
+.ik-mshot {
+  flex: none; width: 76px; height: 76px; padding: 0; border: 0; border-radius: 16px; overflow: hidden; cursor: pointer;
+  display: grid; place-items: center; background: var(--tint); color: #FFFFFF; font: inherit;
+}
+.ik-mshot .ico { width: 30px; height: 30px; }
+.ik-mshot:disabled { opacity: .5; cursor: default; }
+.ik-mshot:focus-visible, .ik-mbtn:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+.ik-mshot-has { background: #000; cursor: zoom-in; }
+.ik-mshot-has img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.ik-mshot-add { background: var(--fill); color: var(--label); }
+.ik-mnum { flex: 1; min-width: 0; }
+.ik-mnum .ik-num { padding: 0 !important; }
+.ik-mnum .ik-num::before { display: none; }
+.ik-mbtn {
+  flex: none; width: 40px; height: 40px; padding: 0; border: 0; border-radius: 20px; cursor: pointer;
+  display: grid; place-items: center; background: var(--fill); color: var(--label);
+}
+.ik-mbtn .ico { width: 20px; height: 20px; }
+.ik-mbtn:disabled { opacity: .45; cursor: default; }
+.ik-mmore { display: flex; align-items: center; gap: 8px; padding-top: 10px; }
+.ik-mmore .ik-strip { display: flex; flex: 1; min-width: 0; gap: 6px; padding: 0; overflow-x: auto; }
+.ik-mmore .ik-th { flex: none; width: 40px; border-radius: 10px; }
+.ik-mmore .ik-cap-n { margin-left: 0; }
+.ik-mrow .ik-cap-busy { padding: 10px 2px 0; }
+.ik-xt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.ik-xt b { font-weight: 600; }
+.ik-xt span { font-size: 14px; line-height: 19px; color: var(--label-2); }
+.ik-xrow .ik-mshot { width: 64px; height: 64px; border-radius: 18px; }
+.ik-xrow .ik-text { padding: 10px 4px 2px; }
+.ik-title + .ik-howbtn { margin-top: 12px; }
+
+/* Подсказка жестов у 3D: видна до первого касания модели (Алхас, 2026-11-25) */
+.ui-gest {
+  position: absolute; left: 50%; bottom: 16px; z-index: 3; transform: translateX(-50%);
+  display: flex; align-items: center; gap: 8px; margin: 0; padding: 8px 16px 8px 10px; width: max-content; max-width: calc(100% - 28px);
+  border-radius: 22px; background: rgba(22, 24, 23, .8); color: #FFFFFF; font-size: 13.5px; line-height: 18px; font-weight: 500; letter-spacing: -.01em;
+  pointer-events: none; -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); box-shadow: 0 8px 24px rgba(0, 0, 0, .18);
+  transition: opacity .35s ease, transform .35s ease;
+}
+.ui-gest[hidden] { display: none; }
+.ui-gest.is-out { opacity: 0; transform: translateX(-50%) translateY(8px); }
+.ui-gest-ico { flex: none; width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; background: rgba(255, 255, 255, .16); }
+.ui-gest-ico svg { width: 18px; height: 18px; animation: gestTurn 2.8s ease-in-out infinite; }
+@keyframes gestTurn { 0%, 100% { transform: rotate(-40deg); } 50% { transform: rotate(40deg); } }
+.is-intake:not(.ik-peek-on) .ui-gest { display: none; }
+@media (prefers-reduced-motion: reduce) { .ui-gest-ico svg { animation: none; } }
+.hw-host:empty { min-height: 420px; }

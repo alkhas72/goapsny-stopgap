@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#F2F2F7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
+<title>GoApsny: Stopgap</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap">
+<link rel="stylesheet" href="src/styles.css">
+<link rel="stylesheet" href="src/skin-violet.css">
+<script>
+// Сиреневая оболочка (проба дизайна) включается только адресом ?skin=violet; без него приложение выглядит как прежде
+(function () {
+  try {
+    if (new URLSearchParams(location.search).get("skin") !== "violet") return;
+    var d = document.documentElement; d.dataset.skin = "violet"; d.dataset.theme = "light";
+    var l = document.createElement("link"); l.rel = "stylesheet";
+    l.href = "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@700&family=Playfair+Display:wght@700;800;900&display=swap";
+    document.head.appendChild(l);
+    document.querySelectorAll('meta[name="theme-color"]').forEach(function (m) { m.content = "#EFE2FC"; });
+  } catch (e) {}
+})();
+</script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/controls/OrbitControls.js"></script>
+</head>
+<body>
+<!-- BODY:START -->
+<div id="app" class="app"></div>
+<noscript><p style="padding:24px;font:17px/1.4 -apple-system,system-ui,sans-serif">Конструктору пандусов нужен JavaScript.</p></noscript>
+<!-- BODY:END -->
+<script type="module" src="src/app.js"></script>
+</body>
+</html>

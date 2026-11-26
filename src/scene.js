@@ -31,7 +31,7 @@ export function createScene(container, opts) {
     Object.assign(overlay.style, { display: "grid", placeItems: "center", font: "500 14px system-ui, sans-serif", color: "#6e6e73", textAlign: "center", padding: "24px" });
     container.appendChild(overlay);
     const noop = () => {};
-    return { setModel: noop, setPaint: noop, setExplode: noop, play: noop, setXray: noop, setBlueprint: noop, setDims: noop, setLite: noop, highlight: noop, resize: noop, setTheme: noop, setStep: noop, isolate: noop, setSpin: noop, setSection: noop };
+    return { setModel: noop, setPaint: noop, setExplode: noop, play: noop, setXray: noop, setBlueprint: noop, setDims: noop, setLite: noop, highlight: noop, resize: noop, setTheme: noop, setMood: noop, setStep: noop, isolate: noop, setSpin: noop, setSection: noop };
   }
   renderer.outputEncoding = T.sRGBEncoding;
   renderer.toneMapping = T.ACESFilmicToneMapping;
@@ -118,25 +118,35 @@ export function createScene(container, opts) {
   // ---------- фон: бесшовная циклорама (экранный градиент с виньеткой, вне тонмаппинга) ----------
   // сиреневая оболочка (?skin=violet): студия и размерные линии в её цветах
   const VIOLET = typeof document !== "undefined" && document.documentElement.dataset.skin === "violet";
+  // «живая» оболочка: фон сцены рисует CSS (градиент настроения и световые пятна), холст прозрачен; свой фон
+  // у сцены остаётся только в режиме «Чертёж». Цвет размерных линий и подписей зависит от настроения.
+  const LIVING = typeof document !== "undefined" && document.documentElement.dataset.skin === "living";
+  const MOODS = {
+    sage: { core: "#C2408F", halo: "#E88CC8", letter: "#A23F86" },
+    orchid: { core: "#161817", halo: "#3A2032", letter: "#A23F86" },
+    lime: { core: "#C2408F", halo: "#E88CC8", letter: "#A23F86" },
+    night: { core: "#EAF372", halo: "#EAF372", letter: "#EAF372" },
+  };
+  let mood = (LIVING && MOODS[document.documentElement.dataset.mood]) ? document.documentElement.dataset.mood : "sage";
   const THEMES = {
     light: VIOLET ? { a: new T.Color("#F1E6FD"), b: new T.Color("#C8ADE2") } : { a: new T.Color("#FBFBFD"), b: new T.Color("#DCDCE2") },
     dark: { a: new T.Color("#3A3A3F"), b: new T.Color("#121214") },
     bp: { a: new T.Color("#1552B2"), b: new T.Color("#072766") },
   };
-  const bgU = { uA: { value: new T.Color() }, uB: { value: new T.Color() }, uAspect: { value: 1 } };
+  const bgU = { uA: { value: new T.Color() }, uB: { value: new T.Color() }, uAspect: { value: 1 }, uAlpha: { value: 1 } };
   const bg = new T.Mesh(
     new T.BufferGeometry().setAttribute("position", new T.Float32BufferAttribute([-1, -1, 0, 3, -1, 0, -1, 3, 0], 3)),
     new T.ShaderMaterial({
-      uniforms: bgU, depthTest: false, depthWrite: false,
+      uniforms: bgU, depthTest: false, depthWrite: false, transparent: LIVING,
       vertexShader: "varying vec2 vUv; void main(){ vUv = position.xy*0.5+0.5; gl_Position = vec4(position.xy, 0.0, 1.0); }",
-      fragmentShader: `uniform vec3 uA; uniform vec3 uB; uniform float uAspect; varying vec2 vUv;
+      fragmentShader: `uniform vec3 uA; uniform vec3 uB; uniform float uAspect; uniform float uAlpha; varying vec2 vUv;
         void main(){
           vec2 p = vUv - vec2(0.5, 0.56); p.x *= uAspect;
           float r = clamp(length(p) / (0.7 + 0.28*max(uAspect-1.0,0.0)), 0.0, 1.0);
           vec3 c = mix(uA, uB, r*r*(3.0-2.0*r));
           c = mix(c, uB, smoothstep(0.42, 0.0, vUv.y) * 0.3);
           c += (fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233))) * 43758.5453) - 0.5) / 255.0;
-          gl_FragColor = vec4(c, 1.0);
+          gl_FragColor = vec4(c, uAlpha);
         }`,
     })
   );
@@ -352,8 +362,8 @@ export function createScene(container, opts) {
         gl_FragColor = vec4(0.86, 0.93, 1.0, a*uK);
       }`,
   });
-  const laserCore = new T.MeshBasicMaterial({ color: lin(VIOLET ? "#6D3ACA" : "#FF7A66"), transparent: true, depthTest: false, depthWrite: false, toneMapped: false });
-  const laserHalo = new T.MeshBasicMaterial({ color: lin(VIOLET ? "#7F4EC5" : "#EF705D"), transparent: true, opacity: 0.2, depthTest: false, depthWrite: false, toneMapped: false });
+  const laserCore = new T.MeshBasicMaterial({ color: lin(LIVING ? MOODS[mood].core : VIOLET ? "#6D3ACA" : "#FF7A66"), transparent: true, depthTest: false, depthWrite: false, toneMapped: false });
+  const laserHalo = new T.MeshBasicMaterial({ color: lin(LIVING ? MOODS[mood].halo : VIOLET ? "#7F4EC5" : "#EF705D"), transparent: true, opacity: 0.2, depthTest: false, depthWrite: false, toneMapped: false });
   const unitCyl = new T.CylinderGeometry(1, 1, 1, 10, 1, false);
   const unitSph = new T.SphereGeometry(1, 14, 10);
   const textMat = new T.MeshStandardMaterial({ map: TX.stencil, transparent: true, depthWrite: false, roughness: 0.5, metalness: 0, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
@@ -623,7 +633,7 @@ export function createScene(container, opts) {
         const el = document.createElement("div");
         el.className = "gs-dim";
         const b = document.createElement("span");
-        Object.assign(b.style, { color: VIOLET ? "#6D3ACA" : "#EF705D", fontWeight: "700", marginRight: "5px" });
+        Object.assign(b.style, { color: LIVING ? MOODS[mood].letter : VIOLET ? "#6D3ACA" : "#EF705D", fontWeight: "700", marginRight: "5px" });
         const t = document.createTextNode("");
         el.append(b, t);
         overlay.appendChild(el);
@@ -685,7 +695,15 @@ export function createScene(container, opts) {
       color: "#1D1524", background: "#FFFFFF", border: "0",
       boxShadow: "0 1px 2px rgba(60,30,100,0.08), 0 6px 16px rgba(74,40,130,0.16)",
       backdropFilter: "none", WebkitBackdropFilter: "none",
+    } : LIVING && !bp ? {
+      font: `600 ${narrow ? 12 : 13}px/1.15 -apple-system, BlinkMacSystemFont, "SF Pro Display", "Inter", "Segoe UI", Roboto, sans-serif`,
+      letterSpacing: "-0.01em",
+      color: mood === "night" ? "#E8F1EB" : "#161817",
+      background: mood === "night" ? "rgba(23,34,28,0.82)" : "rgba(255,255,255,0.9)", border: "0",
+      boxShadow: mood === "night" ? "0 6px 20px rgba(0,0,0,0.4)" : "0 1px 2px rgba(0,0,0,0.04), 0 8px 20px rgba(0,0,0,0.10)",
+      backdropFilter: "blur(14px)", WebkitBackdropFilter: "blur(14px)",
     } : null);
+    if (LIVING) for (const L of Object.values(labelsByKey)) L.b.style.color = bp ? "#FFB3A6" : MOODS[mood].letter;
   }
 
   // ---------- детали: создание, плавная смена формы, удаление ----------
@@ -930,6 +948,7 @@ export function createScene(container, opts) {
     const x = xK.v, b = bK.v, th = thK.v, sec = secK.v;
     bgU.uA.value.copy(THEMES.light.a).lerp(THEMES.dark.a, th).lerp(THEMES.bp.a, b);
     bgU.uB.value.copy(THEMES.light.b).lerp(THEMES.dark.b, th).lerp(THEMES.bp.b, b);
+    if (LIVING) { bgU.uA.value.copy(THEMES.bp.a); bgU.uB.value.copy(THEMES.bp.b); bgU.uAlpha.value = b; }
     key.intensity = KEY_I * (1 - 0.15 * th) * (1 - b) * (camAnim.light ? 0.55 + 0.45 * easeOut(camAnim.t) : 1);
     hemi.intensity = (lite || !envTex ? HEMI_NOENV : HEMI_ENV) * (1 - 0.5 * b);
     let cast = x < 0.5 && b < 0.5;
@@ -1249,6 +1268,13 @@ export function createScene(container, opts) {
     highlight,
     resize,
     setTheme(t) { theme = t === "dark" ? "dark" : "light"; thK.to = theme === "dark" ? 1 : 0; styleLabels(); },
+    // настроение «живой» оболочки: цвет размерных линий и подписей
+    setMood(m) {
+      if (!LIVING || !MOODS[m]) return;
+      mood = m;
+      laserCore.color.copy(lin(MOODS[m].core)); laserHalo.color.copy(lin(MOODS[m].halo));
+      styleLabels(); lookDirty = true; needsRender = true;
+    },
     // пошаговая сборка: 1 measure, 2 sides, 3 rear, 4 rib, 5 ply, 6 finish; null — свободный конструктор
     setStep(n) {
       if (typeof n === "string") n = STEP_IDS.indexOf(n) + 1 || (Number.isFinite(+n) ? +n : null);

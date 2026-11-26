@@ -1,12 +1,17 @@
 import { build, validate, DEFAULTS, MAX_H, PLY, RIB_OVER, PARAMS_VERSION } from "./ramp.js";
 import { createPaints } from "./paints.js";
 import { createPdf } from "./pdf.js";
+import { createRampsSource } from "./ramps-source.js";
+import { createRampLayers } from "./ramps-layer.js";
+import { createHowto } from "./howto.js";
 // «Новый замер»: пошаговая анкета замерщика (заявка на пандус) с фото или видео и помощником Claude.
 // createIntake() без DOM отдаёт чистые функции (их проверяет tests/intake.test.mjs),
 // createIntake().mount(root, handlers) строит мастер поверх конструктора; 3D остаётся прежней сценой.
 // Помощник — возможность sample (window.claude.use), заявки — db, личность — user, файл — downloads.
 // Каждая возможность может прийти null: мастер работает и без них. Единственное объявление верхнего уровня.
 export function createIntake() {
+  // точка объекта на карте: проверка координат — как у карты пандусов (src/ramps-source.js), движок карты — src/ramps-layer.js
+  const GEO = createRampsSource({ fetch: null, storage: null, search: "" }), GEOMAP = createRampLayers();
   // ---------- все тексты для людей: правятся здесь ----------
   const T = {
     entry: "Новый замер",
@@ -14,7 +19,7 @@ export function createIntake() {
     closeAria: "Закрыть замер и вернуться к конструктору. Черновик сохранится",
     stepOf: (i, n) => `Шаг ${i} из ${n}`,
     progAria: "Шаги замера",
-    back: "Назад", next: "Далее", toSend: "К отправке",
+    back: "Назад", next: "Далее",
     optional: "необязательно", required: "обязательно",
     mm: "мм",
     resume: {
@@ -23,46 +28,55 @@ export function createIntake() {
       cont: "Продолжить", fresh: "Начать заново",
       freshConfirm: "Удалить черновик и его фото и начать заново?",
     },
-    roles: [
-      { v: "staff", t: "Сотрудник учреждения" },
-      { v: "auditor", t: "Аудитор сообщества" },
-      { v: "other", t: "Другое" },
-    ],
+    // Пять шагов в порядке Алхаса (2026-11-25): общий план до замеров, все замеры на одном экране, примерка (цвет),
+    // «Представьтесь» без списка ролей, «Итоговая анкета» вместо «Проверки» и «Отправки».
     steps: {
-      // Сценарий съёмки (Алхас, 2026-11-08): замер строится вокруг серии фото. Минимум 4 снимка —
-      // высота А, высота Б, отмеренная ширина, общий план; потом необязательно — другие места для пандуса.
-      // Тексты — только то, что помогает замеру (Алхас, 2026-11-08: «никакой избыточной информации»).
-      who: { short: "Кто и где", title: "Кто и где", lead: "" },
-      hl: { short: "Высота А", title: "Высота слева", lead: "Рулетка вертикально у левого края, вплотную к ступени.", label: "Высота А", sub: "от земли до верха ступени", media: "Фото рулетки у точки А", shot: "Снимите рулетку слева" },
-      hr: { short: "Высота Б", title: "Высота справа", lead: "То же у правого края, в той же линии.", label: "Высота Б", sub: "от земли до верха ступени", media: "Фото рулетки у точки Б", shot: "Снимите рулетку справа" },
-      free: { short: "Ширина", title: "Ширина", lead: "Рулетка вдоль ступени от А до Б: обычно 90 см, в узком проёме 80–85.", label: "Свободная ширина", sub: "между выступами, у ступени", media: "Фото отмеренной ширины", shot: "Снимите рулетку вдоль ступени" },
-      width: { short: "Ширина", title: "Ширина пандуса", lead: "", label: "Ширина пандуса", sub: "900 мм или меньше" },
-      overview: { short: "Общий план", title: "Общий план", lead: "Отойдите на 3–4 м и снимите вход целиком.", media: "Фото общего плана", shot: "Снимите вход целиком" },
-      extra: { short: "Ещё места", title: "Где ещё нужен пандус", lead: "Необязательно. Подиум, туалет, порог внутри: снимите, если есть.", media: "Другие места", shot: "Снимите ступень или порог", note: "Что на снимках", notePh: "Подиум у сцены 25 см, порог в туалет…" },
-      check: { short: "Пандус", title: "Ваш пандус", lead: "" },
+      overview: { short: "Общий план", title: "Общий план", lead: "Отойдите на 3–4 м и снимите вход целиком.", media: "Фото общего плана", shot: "Открыть камеру" },
+      measure: { short: "Замеры", title: "Замеры", lead: "Три числа у ступени. К каждому снимок рулетки." },
       fit: { short: "Примерка", title: "Примерка", lead: "Выберите цвет, поставьте пандус к ступени в AR и сохраните снимок экрана.", media: "Снимок примерки", shot: "Добавьте снимок экрана из AR", gallery: true },
-      send: { short: "Отправка", title: "Отправка", lead: "" },
+      who: { short: "Представьтесь", title: "Представьтесь", lead: "" },
+      send: { short: "Анкета", title: "Итоговая анкета", lead: "" },
     },
-    distAB: (w) => `Расстояние между точками А и Б — ${w} мм, это ширина пандуса.`,
-    abNote: "Точки А и Б — края будущего пандуса, обычно в 90 см друг от друга.",
-    narrow: "Мерьте по краям пандуса, не на узкой базе 30–50 см.",
+    // Снимки и числа шагов: серия фото вокруг замера (Алхас, 2026-11-08). Минимум 4 снимка: общий план,
+    // рулетка у точки А, отмеренная ширина, рулетка у точки Б; необязательно ещё места для пандуса.
+    slots: {
+      hl: { short: "Высота А", label: "Высота А", sub: "от земли до верха ступени", media: "Фото рулетки у точки А", shot: "Снять рулетку слева" },
+      free: { short: "Ширина", label: "Свободная ширина", sub: "между выступами, у ступени", media: "Фото отмеренной ширины", shot: "Снять рулетку вдоль ступени" },
+      hr: { short: "Высота Б", label: "Высота Б", sub: "от земли до верха ступени", media: "Фото рулетки у точки Б", shot: "Снять рулетку справа" },
+      width: { short: "Ширина", label: "Ширина пандуса", sub: "900 мм или меньше" },
+      overview: { short: "Общий план", media: "Фото общего плана", shot: "Открыть камеру" },
+      extra: { short: "Ещё места", title: "Где ещё нужен пандус", sub: "Подиум, туалет, порог внутри. Необязательно.", media: "Другие места", shot: "Снять ступень или порог", note: "Что на снимках", notePh: "Подиум у сцены 250 мм, порог в туалет…" },
+      fit: { short: "Примерка", media: "Снимок примерки", shot: "Добавьте снимок экрана из AR", gallery: true },
+    },
+    how: { open: "Как замерить", sub: "показ, 20 секунд", title: "Как замерить", close: "Закрыть показ" },
+    narrow: "Высоты мерьте по краям будущего пандуса, не ближе друг к другу.",
     asIs: "Введите число как есть, без округления. Можно с запятой: 87,5.",
     fitFree: (fw) => `Взять по свободной ширине: ${fw} мм`,
     fitDone: (fw) => `Ширина равна свободной: ${fw} мм`,
     hrSameNote: "Пока высота Б не введена, 3D показывает ровный порог высотой А.",
     tooHighNote: "Заявку всё равно можно отправить: замер пригодится мастерской.",
     fields: {
-      role: "Кто вы", roleOther: "Кто именно", name: "Имя и фамилия", contact: "Телефон или другой контакт",
+      name: "Имя", nameSub: "фамилия по желанию", contact: "Телефон", contactSub: "или другой контакт",
       object: "Учреждение или объект", address: "Адрес", entrance: "Какой вход", comment: "Комментарий",
     },
+    where: "Где",
+    geo: {
+      label: "Точка на карте", none: "не отмечена",
+      hint: "Нажмите на карту там, где вход. Точку можно двигать.",
+      wait: "Загружаю карту…", fail: "Карта не загрузилась. Точку можно поставить кнопкой «Где я».",
+      me: "Где я", clear: "Убрать точку", locating: "Определяю место…",
+      gps: (acc) => (acc != null ? `Точка по геолокации, точность около ${acc} м. Поправьте её на карте, если вход в стороне.` : "Точка по геолокации. Поправьте её на карте, если вход в стороне."),
+      geoNone: "Геолокация здесь недоступна.", geoDenied: "Нет доступа к геолокации.", geoFail: "Не удалось определить место.",
+      zoomIn: "Приблизить", zoomOut: "Отдалить", sum: "Точка на карте",
+    },
     ph: {
-      roleOther: "например, родственник", name: "Как к вам обращаться", contact: "+7 940 …, Telegram, почта",
+      name: "Как к вам обращаться", contact: "+7 940 …, Telegram, почта",
       object: "Школа № 3, поликлиника…", address: "Город, улица, дом", entrance: "главный, со двора…",
       comment: "Ступень сколота, рядом люк…", number: "0",
     },
     need: {
-      role: "Выберите, кто вы.", name: "Впишите имя.", object: "Впишите учреждение или объект.", address: "Впишите адрес.",
-      overview: "Снимите вход целиком.", photo: "Сначала снимите рулетку.", free: "Введите свободную ширину: без неё замер неполный.",
+      name: "Впишите имя.", object: "Впишите учреждение или объект.", address: "Впишите адрес.",
+      overview: "Нужен снимок входа.", photo: "Сначала снимите рулетку.", free: "Введите свободную ширину: без неё замер неполный.",
       number: "Это не число. Только цифры и запятая, например 845,5.", positive: "Число должно быть больше нуля.",
       hl: "Введите высоту А.", hr: "Введите высоту Б.",
     },
@@ -93,7 +107,7 @@ export function createIntake() {
       see3dPhone: "3D-модель вверху показывает этот пандус.", see3dDesk: "3D-модель рядом показывает этот пандус.",
     },
     send: {
-      who: "Кто меряет", obj: "Объект", measure: "Замер", notes: "Заметки", edit: "Изменить", photos: "Снимков",
+      ramp: "Ваш пандус", who: "Кто меряет", obj: "Где", measure: "Замер", notes: "Заметки", edit: "Изменить", photos: "Снимков",
       submit: "Отправить заявку", sending: "Отправляю…",
       okTitle: "Заявка отправлена", okText: (id) => `Номер заявки: ${id}.`,
       photosSaved: (n, m) => `Снимков сохранено с заявкой: ${n} из ${m}.`,
@@ -103,11 +117,12 @@ export function createIntake() {
       localText: (id) => `Номер: ${id}. Скачайте файл заявки и передайте его в АИС.`,
       why: { nodb: "Хранилище заявок здесь недоступно.", noid: "Не удалось узнать вашу учётную запись: войдите в Claude, чтобы отправлять заявки.", timeout: "Хранилище не ответило за 10 секунд.", error: "Хранилище отклонило заявку." },
       download: "Скачать заявку PDF", making: "Готовлю PDF…", pdfFail: "PDF не собрался: нет связи с сервером библиотеки. Попробуйте ещё раз.", downloaded: "Файл заявки сохранён.", declined: "Сохранение отменено.", noDownload: "Скачивание здесь недоступно.",
-      again: "Новый замер", toApp: "К конструктору",
+      again: "Новый замер", toApp: "К конструктору", backToMap: "Вернуться на карту",
     },
     paint: {
-      title: "Покраска OSOKA", aria: "Цвет покраски", row: "Покраска",
-      rawName: "Без покраски", rawSub: "фанера и сосна без покрытия",
+      // название краски и номер по вееру человеку не показываем: краска сегодня одна, завтра другая (Алхас, 2026-11-25)
+      title: "Цвет", aria: "Цвет пандуса", row: "Цвет",
+      rawName: "Без покраски",
       note: "Цвет на экране приблизительный.",
     },
     ar: {
@@ -119,9 +134,7 @@ export function createIntake() {
       name: "Помощник", aria: "Помощник: голосом", open: "Сказать помощнику голосом", close: "Закрыть",
       // приглашение на каждом шаге (Алхас, 2026-11-08: помощник явно виден и зовёт говорить голосом)
       invite: {
-        hl: "Говорите голосом: что видите у ступени", hr: "Говорите голосом: что видите у ступени",
-        free: "Скажите, что мешает: наличник, труба, перила", overview: "Опишите вход голосом",
-        extra: "Расскажите, где ещё нужен пандус", check: "Спросите или уточните голосом",
+        overview: "Опишите вход голосом", measure: "Говорите голосом: что видите у ступени",
         fit: "Скажите, какой цвет выбрало заведение", who: "Скажите, что важно знать мастерской", send: "Добавьте голосом, что важно мастерской",
       },
       placeholder: "Скажите или напишите",
@@ -151,42 +164,29 @@ export function createIntake() {
       needMedia: "Сначала снимите фото или видео на этом шаге.",
       quick: {
         overview: [["check", "Проверь фото"]],
-        free: [["read", "Прочитай число"], ["check", "Проверь фото"]],
-        extra: [["check", "Проверь фото"]],
-        hl: [["read", "Прочитай число"], ["check", "Проверь фото"]],
-        hr: [["read", "Прочитай число"], ["check", "Проверь фото"]],
+        measure: [["read", "Прочитай число"], ["check", "Проверь фото"]],
         fit: [["check", "Проверь снимок"]],
-        check: [["issues", "Что не так?"]],
+        send: [["issues", "Что не так?"]],
       },
       checkVideo: "Проверь кадры",
       ask: {
         check: "Проверь снимки этого шага: рулетка стоит в линии примыкания к ступени? Число читается? Это нужный край?",
-        read: "Прочитай значение на рулетке на снимках этого шага. Если читается ясно, предложи число.",
+        read: "Прочитай значения на рулетке на снимках этого шага. Если читается ясно, предложи число для своего поля.",
         issues: "Объясни замечания к замеру и что исправить.",
-      },
-      tips: {
-        who: "Укажите, кто меряет, и точный адрес объекта. Имя и контакт видят только владелец и редакторы страницы.",
-        overview: "Отойдите на 3–4 метра и снимите вход целиком: дверь, ступень и площадку, где встанет пандус.",
-        free: "Рулетку держите ровно у ступени, там, где пандус встанет вплотную. Мерьте между выступами: наличники, трубы, перила. Ширина пандуса — 900 мм или свободная ширина, если она меньше.",
-        width: "Ширина пандуса не больше свободной ширины. Обычно 900 мм; если свободно меньше, возьмите свободную ширину.",
-        extra: "Снимайте всё, что мешает человеку на коляске дальше входа: подиумы, ступени внутри, туалет, узкие двери. Это необязательно.",
-        hl: "Слева, на краю будущего пандуса, в линии примыкания: рулетка вертикально от земли до верха ступени. Не мерьте на узкой базе 30–50 см.",
-        hr: "Справа, на другом краю пандуса, в той же линии. Между точками А и Б — ровно ширина пандуса.",
-        check: "Посмотрите тип порога, уклон и ребро. Если число неверное, вернитесь к шагу и исправьте.",
-        send: "Проверьте данные. В комментарий — всё, чего нет в полях.",
-        fit: "Откройте AR, поставьте пандус вплотную к ступени, сделайте снимок экрана и добавьте его из галереи.",
       },
     },
   };
 
   // ---------- шаги ----------
-  // Порядок — как снимает замерщик (Алхас, 2026-11-08): А, Б, ширина, общий план, «глубже»; кто и где — в конце
-  const STEPS = ["hl", "hr", "free", "overview", "extra", "check", "fit", "who", "send"];
+  const STEPS = ["overview", "measure", "fit", "who", "send"];
+  // Слоты снимков: имена прежние, по ним заявка и PDF подписывают фото. На шаге «Замеры» порядок как в показе: А, ширина, Б
   const MEDIA_STEPS = ["hl", "hr", "free", "overview", "extra", "fit"];
-  const PHOTO_REQUIRED = ["hl", "hr", "free", "overview"];   // программа-минимум: 4 снимка
+  const STEP_SLOTS = { overview: ["overview", "extra"], measure: ["hl", "free", "hr"], fit: ["fit"], who: [], send: [] };
+  const PHOTO_REQUIRED = ["overview", "hl", "free", "hr"];   // программа-минимум: 4 снимка
   const MAX_PHOTOS = 3, MAX_EXTRA = 8;
-  const maxPhotos = (step) => (step === "extra" ? MAX_EXTRA : MAX_PHOTOS);
-  const FIELD_STEP = { freeWidth: "free", width: "free", hl: "hl", hr: "hr" };
+  const maxPhotos = (slot) => (slot === "extra" ? MAX_EXTRA : MAX_PHOTOS);
+  const FIELD_STEP = { freeWidth: "measure", width: "measure", hl: "measure", hr: "measure" };
+  const FLOW = 5;                               // номер порядка шагов: черновик с другим номером начинает с первого шага
   const DRAFT_KEY = "goapsny-stopgap:intake-draft:v2";
   const SENT_KEY = "goapsny-stopgap:intake-sent:v1";
   const DB_TIMEOUT = 10000;
@@ -243,16 +243,41 @@ export function createIntake() {
     return Array.from({ length: k }, (_, i) => Math.min(end, ms((i + 0.5) * duration / k)));
   }
 
+  // uuid заявки (в плане данных GoApsny request_id — uuid); короткий номер r… остаётся для людей
+  function newUuid() {
+    try { if (typeof crypto !== "undefined" && crypto.randomUUID) return crypto.randomUUID(); } catch {}
+    const b = new Uint8Array(16);
+    try { crypto.getRandomValues(b); } catch { for (let i = 0; i < 16; i++) b[i] = Math.floor(Math.random() * 256); }
+    b[6] = (b[6] & 0x0f) | 0x40; b[8] = (b[8] & 0x3f) | 0x80;
+    const h = Array.from(b, (x) => x.toString(16).padStart(2, "0")).join("");
+    return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
+  }
   function newId(now = Date.now(), rnd = Math.random) {
     return "r" + now.toString(36) + Math.floor(rnd() * 36 ** 4).toString(36).padStart(4, "0");
   }
   function emptyDraft(now = new Date()) {
     return {
-      v: 2, id: newId(now.getTime()), createdAt: now.toISOString(), updatedAt: now.toISOString(), step: 0, maxStep: 0, mode: "photo",
+      v: 2, flow: FLOW, id: newId(now.getTime()), uuid: newUuid(), createdAt: now.toISOString(), updatedAt: now.toISOString(), step: 0, maxStep: 0, mode: "photo",
       role: "", roleOther: "", name: "", contact: "", object: "", address: "", entrance: "",
       free: "", width: "", hl: "", hr: "", comment: "", extraNote: "",
+      geo: null, placeId: null, returnUrl: null,       // точка объекта, место из GoApsny и куда вернуться после заявки
       media: { hl: [], hr: [], free: [], overview: [], extra: [], fit: [] }, chat: [], sent: null,
     };
+  }
+  // Предзаполнение с карты: open({ place: { place_id, name, address, entrance, lat, lng }, returnUrl }).
+  // Меняет только поля места в черновике; пустые значения ничего не затирают. Возвращает тот же черновик
+  function applyPrefill(d, prefill) {
+    const p = prefill && prefill.place;
+    if (p && typeof p === "object") {
+      const g = GEO.geoPoint({ lat: p.lat, lng: p.lng, src: "tap" });
+      if (typeof p.name === "string" && p.name.trim()) d.object = clip(p.name, 300);
+      if (typeof p.address === "string" && p.address.trim()) d.address = clip(p.address, 400);
+      if (typeof p.entrance === "string" && p.entrance.trim()) d.entrance = clip(p.entrance, 200);
+      if (g) d.geo = g;
+      d.placeId = GEO.uuidOr(p.place_id);
+    }
+    if (prefill && typeof prefill.returnUrl === "string") d.returnUrl = GEO.safeReturn(prefill.returnUrl, typeof location !== "undefined" ? location.origin : null);
+    return d;
   }
   const hasData = (d) => !!d && !d.sent && !!(d.role || d.name || d.object || d.address || d.free || d.hl || d.hr || MEDIA_STEPS.some((s) => d.media?.[s]?.length));
 
@@ -272,19 +297,29 @@ export function createIntake() {
     return p;
   }
 
-  // Можно ли дальше: { ok, reason, warn }. Тексты ошибок замера — из validate() (src/ramp.js)
-  function stepCheck(id, d, mediaCount = 0) {
+  // Можно ли дальше: { ok, reason, warn, rule, slot }. Тексты ошибок замера — из validate() (src/ramp.js).
+  // id — шаг мастера или отдельное число замера (hl, hr, free, width). mc — число снимков; для шага «Замеры» — счёт по слотам { hl, free, hr }
+  function stepCheck(id, d, mc = 0) {
     const R = (reason, rule = false) => ({ ok: false, reason, warn: "", rule });
-    const v = values(d);
+    const v = values(d), n = typeof mc === "number" ? mc : 0;
+    if (id === "measure") {
+      const cnt = mc && typeof mc === "object" ? mc : {}, generic = [T.need.photo, T.need.number, T.need.positive];
+      let warn = "";
+      for (const slot of STEP_SLOTS.measure) {
+        const c = stepCheck(slot, d, cnt[slot] || 0);
+        if (!c.ok) return { ...c, slot, reason: generic.includes(c.reason) ? `${T.slots[slot].label}. ${c.reason}` : c.reason };
+        if (c.warn && !warn) warn = c.warn;
+      }
+      return { ok: true, reason: "", warn, rule: !!warn };
+    }
     if (id === "who") {
-      if (!d.role) return R(T.need.role);
       if (!d.name.trim()) return R(T.need.name);
       if (!d.object.trim()) return R(T.need.object);
       if (!d.address.trim()) return R(T.need.address);
     } else if (id === "overview") {
-      if (mediaCount < 1) return R(T.need.overview);
+      if (n < 1) return R(T.need.overview);
     } else if (id === "free") {
-      if (mediaCount < 1) return R(T.need.photo);
+      if (n < 1) return R(T.need.photo);
       const x = parseNum(d.free);
       if (x === null) return R(T.need.free);
       if (x === undefined) return R(T.need.number);
@@ -299,7 +334,7 @@ export function createIntake() {
       const err = validate({ ...DEFAULTS, freeWidth: v.freeWidth, width: v.width ?? 0 }).find((x) => x.level === "error");
       if (err) return R(err.text, true);
     } else if (id === "hl" || id === "hr") {
-      if (mediaCount < 1) return R(T.need.photo);
+      if (n < 1) return R(T.need.photo);
       const x = parseNum(d[id]);
       if (x === null) return R(T.need[id]);
       if (x === undefined) return R(T.need.number);
@@ -310,26 +345,30 @@ export function createIntake() {
     }
     return { ok: true, reason: "", warn: "", rule: false };
   }
+  // Счёт снимков для шага: у «Замеров» — по слотам, у остальных — число в главном слоте шага
+  const stepCount = (id, counts) => (id === "measure" ? counts || {} : (counts && counts[id]) || 0);
   // Первый шаг, который ещё не пройден (для перехода по полоске шагов)
   function firstBlocked(d, counts) {
-    for (let i = 0; i < STEPS.length; i++) if (!stepCheck(STEPS[i], d, counts[STEPS[i]] || 0).ok) return i;
+    for (let i = 0; i < STEPS.length; i++) if (!stepCheck(STEPS[i], d, stepCount(STEPS[i], counts)).ok) return i;
     return STEPS.length;
   }
 
   const clip = (s, n) => String(s ?? "").trim().slice(0, n);
+  // Роль в мастере больше не спрашивается (Алхас, 2026-11-25): поля role и roleText остаются в заявке ради прежнего формата
+  const ROLE_TEXT = { staff: "Сотрудник учреждения", auditor: "Картограф сообщества" };
   function roleText(d) {
-    const r = T.roles.find((x) => x.v === d.role);
-    return d.role === "other" && d.roleOther.trim() ? clip(d.roleOther, 120) : r ? r.t : "";
+    return d.role === "other" && String(d.roleOther || "").trim() ? clip(d.roleOther, 120) : ROLE_TEXT[d.role] || "";
   }
   // Заявка: всё, что ушло в хранилище или в файл. Числа расчёта — только из build().dims
   function buildRequest(d, model, { now = new Date(), photos = [], paint = null } = {}) {
-    const v = values(d), dm = model.dims, p = model.params;
+    const v = values(d), dm = model.dims, p = model.params, geo = GEO.geoPoint(d.geo);
     return {
       v: 1, type: "ramp-request", app: "goapsny-stopgap", paramsVersion: PARAMS_VERSION,
-      id: d.id, createdAt: d.createdAt, submittedAt: now.toISOString(),
+      id: d.id, uuid: d.uuid || newUuid(), createdAt: d.createdAt, submittedAt: now.toISOString(),
       role: d.role, roleText: roleText(d),
       measurer: { name: clip(d.name, 200), contact: clip(d.contact, 200) },
-      object: { name: clip(d.object, 300), address: clip(d.address, 400), entrance: clip(d.entrance, 200) },
+      // place_id — uuid места из GoApsny, если замер начат с его карты; geo — точка входа, если отмечена
+      object: { name: clip(d.object, 300), address: clip(d.address, 400), entrance: clip(d.entrance, 200), place_id: GEO.uuidOr(d.placeId), ...(geo ? { geo } : {}) },
       measure: { freeWidth: v.freeWidth, width: v.width, hl: v.hl, hr: v.hr, raw: { freeWidth: d.free.trim(), width: d.width.trim(), hl: d.hl.trim(), hr: d.hr.trim() } },
       params: { hl: p.hl, hr: p.hr, width: p.width, board: p.board, freeWidth: p.freeWidth },
       paint: paint ? { hex: paint.hex ?? null, ral: paint.ral || "", name: paint.name || "" } : { hex: null, ral: PAINTS.RAW.ral, name: PAINTS.RAW.name },
@@ -355,8 +394,16 @@ export function createIntake() {
     if (hit) return { hex: x, ral: hit.ral, name: hit.name };
     return x ? { hex: x, ral: "", name: "" } : { hex: null, ral: PAINTS.RAW.ral, name: PAINTS.RAW.name };
   }
+  // Где лежит примерка. На сайте — рядом с приложением (ar.html в той же папке): ссылка верна и на своём адресе,
+  // и в папке внутри карты (/zamer/). В сборке одним файлом соседней страницы нет: там запасной адрес AR_BASE
+  function arBase(href, sibling) {
+    const h = href !== undefined ? href : typeof location !== "undefined" ? location.href : "";
+    const sib = sibling !== undefined ? sibling : typeof document !== "undefined" && !!document.querySelector('script[src$="src/boot.js"]');
+    if (!sib || !/^https?:/i.test(String(h))) return AR_BASE;
+    try { return new URL(".", h).href.replace(/\/+$/, ""); } catch { return AR_BASE; }
+  }
   // Ссылка «Примерить в AR»: числа как введены (запятая допустима), покраска без # или raw
-  function arUrl(v, paintHex, base = AR_BASE) {
+  function arUrl(v, paintHex, base = arBase()) {
     const q = new URLSearchParams();
     for (const k of ["hl", "hr", "width", "board"]) {
       const s = v && v[k] != null ? String(v[k]).trim() : "";
@@ -364,7 +411,7 @@ export function createIntake() {
     }
     const hx = paintHex ? String(paintHex).trim().replace(/^#/, "") : "";
     q.set("paint", /^[0-9a-f]{6}$/i.test(hx) ? hx.toUpperCase() : "raw");
-    return `${String(base).replace(/\/+$/, "")}/ar?${q.toString()}`;
+    return `${String(base).replace(/\/+$/, "")}/ar.html?${q.toString()}`;
   }
   // Значения для AR из черновика: как введены; Б по умолчанию = А, ширина по умолчанию — из расчёта
   function arValues(d, model) {
@@ -426,6 +473,7 @@ export function createIntake() {
       "Замерщик чаще говорит голосом: в тексте возможны ошибки распознавания. Если это заметка, а не вопрос, ответь одним коротким предложением, что записано; если в ней названо число для поля этого шага, предложи его строкой ПРЕДЛОЖЕНИЕ (сантиметры переведи в миллиметры).",
       "",
       `Сейчас шаг ${i + 1} из ${STEPS.length}: «${S.title}». Задача шага: ${S.lead || S.title}`,
+      ...(stepId === "measure" ? ["На этом шаге три поля: hl (высота А, слева), freeWidth (свободная ширина) и hr (высота Б, справа). Снимки подписаны, к какому полю они относятся."] : []),
       `Уже введено: ${known.join("; ")}.`,
     ];
     if (ctx.summary) lines.push(`Расчёт приложения (рабочая формула): ${ctx.summary}.`);
@@ -452,6 +500,8 @@ export function createIntake() {
   // ======================================================================
   function mount(root, handlers) {
     const h = handlers || {};
+    // Режим мастера (без конструктора): выход ведёт на карту, а не в конструктор
+    if (h.exitTo === "map") { T.close = "На карту"; T.closeAria = "Закрыть замер и вернуться на карту. Черновик сохранится"; T.send.toApp = "На карту"; }
     const doc = document;
     const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
     const $ = (sel, el = box) => el.querySelector(sel);
@@ -459,6 +509,8 @@ export function createIntake() {
     const mqWide = matchMedia("(min-width: 1200px)");
     const mqPhone = matchMedia("(max-width: 819.98px)");
     const ICON = {
+      plus: '<path d="M12 5.5v13M5.5 12h13" style="fill:none;stroke:currentColor" stroke-width="2.2" stroke-linecap="round"/>',
+      play: '<path d="M8 5.2v13.6a.9.9 0 0 0 1.4.8l10.4-6.8a.9.9 0 0 0 0-1.6L9.4 4.4A.9.9 0 0 0 8 5.2z" style="fill:currentColor"/>',
       back: '<path d="M14.5 5.5 8 12l6.5 6.5" style="fill:none;stroke:currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>',
       chev: '<path d="M9.5 5.5 16 12l-6.5 6.5" style="fill:none;stroke:currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>',
       up: '<path d="M5.5 14.5 12 8l6.5 6.5" style="fill:none;stroke:currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>',
@@ -485,6 +537,10 @@ export function createIntake() {
     let d = null;
     try { d = JSON.parse(localStorage.getItem(DRAFT_KEY) || "null"); } catch { d = null; }
     if (!d || d.v !== 2) d = emptyDraft();
+    if (d.flow !== FLOW) { d.flow = FLOW; d.step = 0; d.maxStep = STEPS.length - 1; }   // черновик прежнего порядка шагов: числа и фото целы, идём с первого шага
+    d.step = Math.max(0, Math.min(STEPS.length - 1, d.step | 0));
+    if (!d.uuid) d.uuid = newUuid();              // черновики до появления uuid
+    d.geo = GEO.geoPoint(d.geo); d.placeId = GEO.uuidOr(d.placeId); d.returnUrl = typeof d.returnUrl === "string" ? d.returnUrl : null;
     d.media = { hl: [], hr: [], free: [], overview: [], extra: [], fit: [], ...(d.media || {}) };
     d.mode = "photo";                            // видео пока не обрабатываем (Алхас, 2026-11-08)
     if (typeof d.extraNote !== "string") d.extraNote = "";
@@ -515,7 +571,8 @@ export function createIntake() {
       };
       return { put: (k, v) => tx("readwrite", (s) => s.put(v, k)), get: (k) => tx("readonly", (s) => s.get(k)), del: (k) => tx("readwrite", (s) => s.delete(k)), clear: () => tx("readwrite", (s) => s.clear()) };
     })();
-    const stepMedia = (s) => (d.media[s] || []).map((id) => media.get(id)).filter(Boolean);
+    const stepMedia = (s) => (d.media[s] || []).map((id) => media.get(id)).filter(Boolean);     // снимки одного слота
+    const stepPhotos = (id) => (STEP_SLOTS[id] || []).flatMap(stepMedia);                          // все снимки шага
     const counts = () => Object.fromEntries(MEDIA_STEPS.map((s) => [s, stepMedia(s).length]));
     async function restoreMedia() {
       for (const s of MEDIA_STEPS) {
@@ -643,6 +700,10 @@ export function createIntake() {
             </form>
             <div class="ik-micbar"><button type="button" class="ik-mic" data-ik-mic aria-pressed="false" aria-label="${esc(T.ai.micOn)}">${icon("mic")}</button><p class="ik-mic-s" data-ik-mic-s aria-live="polite"></p></div>
           </aside>
+          <div class="ik-how" data-ik-how role="dialog" aria-label="${esc(T.how.title)}" hidden>
+            <div class="ik-how-head"><h2>${esc(T.how.title)}</h2><button type="button" class="ik-ai-x" data-ik-how-close aria-label="${esc(T.how.close)}">${icon("close")}</button></div>
+            <div class="ik-how-sc" data-ik-how-sc></div>
+          </div>
           <div class="ik-zoom" data-ik-zoom role="dialog" aria-label="${esc(T.media.zoomAria)}" hidden>
             <button type="button" class="ik-ai-x ik-zoom-x" data-ik-zoom-close aria-label="${esc(T.ai.close)}">${icon("close")}</button>
             <div class="ik-zoom-sc" data-ik-zoom-sc><img data-ik-zoom-img alt=""></div>
@@ -663,7 +724,7 @@ export function createIntake() {
     // ---------- состояние ----------
     const SR = typeof window !== "undefined" ? window.SpeechRecognition || window.webkitSpeechRecognition || null : null;
     let rec = null;
-    const st = { listening: false, micErr: !SR, tried: {}, open: false, view: "step", aiOpen: false, busy: false, ctl: null, sample: undefined, aiOff: "", imagesOK: false, maxImages: 4, capBusy: "", capMsg: "", capFromAi: false, sending: false, sendNote: "", lastApplied: "", opener: null };
+    const st = { listening: false, micErr: !SR, tried: {}, open: false, view: "step", aiOpen: false, busy: false, ctl: null, sample: undefined, aiOff: "", imagesOK: false, maxImages: 4, capBusy: "", capMsg: "", capSlot: "", capFromAi: false, sending: false, sendNote: "", lastApplied: "", opener: null };
     const curStep = () => STEPS[d.step] || STEPS[0];
 
     // ---------- возможности ----------
@@ -687,80 +748,67 @@ export function createIntake() {
     // покраска живёт в конструкторе (state.paint): мастер только читает её и меняет тем же onPaint; цвета — из src/paints.js
     const paints = PAINTS.list();
     const curPaint = () => (typeof h.getPaint === "function" ? h.getPaint() : null) || null;
+    // 3D-сцена конструктора за листом «Примерки» есть только там, где мастер открыт из конструктора.
+    // В режиме мастера (src/wizard.js) сцены нет: шаг занимает весь экран, цвет показывает плитка.
+    const withScene = typeof h.getModel === "function";
+    const heroCls = (hex) => `finish-hero ik-hero${hex ? "" : " finish-raw"}`;
+    // человеку — только название цвета по-русски (Алхас, 2026-11-25); марка краски и номер по вееру остаются в заявке для мастерской
+    const cap1 = (t) => (t ? t.charAt(0).toUpperCase() + t.slice(1) : "");
+    function paintLabel(hex) {
+      const r = paintRecord(hex, paints); if (!r.hex) return T.paint.rawName;
+      const hit = paints.find((p) => p.hex && p.hex.toUpperCase() === r.hex);
+      return cap1((hit && (hit.ru || hit.name)) || r.name || r.hex);
+    }
     function paintHTML() {
       if (!paints.length) return "";
       const P = T.paint, r = paintRecord(curPaint(), paints);
       return `<div class="ik-sum-h"><span>${esc(P.title)}</span></div><div class="group finish ik-paint">
-        <div class="swatch-name" aria-live="polite"><span class="finish-name" data-ik-paint-name>${esc(r.hex ? r.name || r.hex : P.rawName)}</span><span class="finish-ral num-tab" data-ik-paint-ral>${esc(r.hex ? [r.ral, r.hex].filter(Boolean).join(" · ") : P.rawSub)}</span></div>
+        ${withScene ? "" : `<div class="${heroCls(r.hex)}" data-ik-hero aria-hidden="true" style="--sw:${r.hex || "#C9A46E"}"><span class="finish-sheen"></span></div>`}
+        <div class="swatch-name" aria-live="polite"><span class="finish-name" data-ik-paint-name>${esc(paintLabel(curPaint()))}</span></div>
         <div class="swatches" role="radiogroup" aria-label="${esc(P.aria)}" data-ik-swatches>${paints.map((p) => {
           const on = (p.hex ? p.hex.toUpperCase() : null) === r.hex;
-          return `<button type="button" role="radio" aria-checked="${on}" tabindex="${on ? 0 : -1}" class="swatch${p.hex ? "" : " swatch-raw"}" data-ik-paint="${p.hex || ""}" aria-label="${esc(p.ral + (p.hex ? ", " + p.name : ""))}" style="--sw:${p.hex || "transparent"}"></button>`;
+          return `<button type="button" role="radio" aria-checked="${on}" tabindex="${on ? 0 : -1}" class="swatch${p.hex ? "" : " swatch-raw"}" data-ik-paint="${p.hex || ""}" aria-label="${esc(paintLabel(p.hex))}" style="--sw:${p.hex || "transparent"}"></button>`;
         }).join("")}</div>
       </div><p class="sec-f">${esc(P.note)}</p>`;
     }
     function setPaint(hex) {
       if (typeof h.onPaint === "function") h.onPaint(hex || null);
-      const P = T.paint, r = paintRecord(curPaint(), paints);
+      const r = paintRecord(curPaint(), paints);
       for (const b of $$("[data-ik-paint]", body)) {
         const on = ((b.dataset.ikPaint || "").toUpperCase() || null) === r.hex;
         b.setAttribute("aria-checked", on ? "true" : "false"); b.tabIndex = on ? 0 : -1;
       }
-      const nm = $("[data-ik-paint-name]", body), rl = $("[data-ik-paint-ral]", body);
-      if (nm) nm.textContent = r.hex ? r.name || r.hex : P.rawName;
-      if (rl) rl.textContent = r.hex ? [r.ral, r.hex].filter(Boolean).join(" · ") : P.rawSub;
-    }
-
-    // ---------- схема «вид сверху» ----------
-    function planSVG(hi, v) {
-      const tint = "var(--tint-ink)", ink = "var(--sch-ink)", mut = "var(--sch-mut)";
-      const on = (k) => hi === k;
-      const pt = (x, L, k) => (on(k) ? `<circle cx="${x}" cy="46" r="17" style="fill:var(--tint-soft)"/>` : "") +
-        `<circle cx="${x}" cy="46" r="${on(k) ? 12 : 10}" style="fill:${on(k) ? "var(--tint)" : "var(--navy-pt)"};stroke:var(--cell)" stroke-width="2"/><text x="${x}" y="50.5" text-anchor="middle" class="sch-pt">${L}</text>`;
-      const fwT = v.freeWidth != null ? `свободно ${num(v.freeWidth)} мм` : "свободная ширина";
-      const wT = `А–Б = ширина пандуса${v.width != null ? " " + num(v.width) + " мм" : ""}`;
-      return `<svg viewBox="0 0 340 222" width="100%" aria-hidden="true" focusable="false">
-        <rect x="0" y="0" width="340" height="46" style="fill:var(--sch-wall)"/>
-        <rect x="88" y="0" width="164" height="46" style="fill:var(--sch-open)"/>
-        <text x="170" y="14" text-anchor="middle" class="sch-t" style="fill:${mut}">дверь</text>
-        <rect x="76" y="12" width="12" height="42" rx="2" style="fill:var(--sch-jamb)"/><rect x="252" y="12" width="12" height="42" rx="2" style="fill:var(--sch-jamb)"/>
-        <text x="70" y="30" text-anchor="end" class="sch-t" style="fill:${mut}">наличник</text>
-        <g style="stroke:${on("free") ? tint : ink}" stroke-width="${on("free") ? 2.4 : 1.2}"><line x1="90" y1="38" x2="250" y2="38"/><path d="M90 32v12M250 32v12"/></g>
-        <text x="170" y="31" text-anchor="middle" class="sch-t sch-b" style="fill:${on("free") ? tint : ink}">${esc(fwT)}</text>
-        <rect x="96" y="46" width="148" height="104" rx="3" style="fill:var(--sch-ramp);stroke:var(--sch-ramp-edge)" stroke-width="1.6"/>
-        <text x="170" y="66" text-anchor="middle" class="sch-t" style="fill:var(--sch-ramp-ink)">↑ линия примыкания</text>
-        <text x="170" y="108" text-anchor="middle" class="sch-t sch-b" style="fill:var(--sch-ramp-ink)">пандус</text>
-        ${pt(96, "А", "hl")}${pt(244, "Б", "hr")}
-        <text x="84" y="76" text-anchor="end" class="sch-t ${on("hl") ? "sch-b" : ""}" style="fill:${on("hl") ? tint : ink}">А слева</text>
-        <text x="256" y="76" class="sch-t ${on("hr") ? "sch-b" : ""}" style="fill:${on("hr") ? tint : ink}">Б справа</text>
-        <g style="stroke:${on("width") ? tint : ink}" stroke-width="${on("width") ? 2.4 : 1.2}"><line x1="96" y1="168" x2="244" y2="168"/><path d="M96 162v12M244 162v12"/></g>
-        <text x="170" y="190" text-anchor="middle" class="sch-t sch-b" style="fill:${on("width") ? tint : ink}">${esc(wT)}</text>
-        <text x="170" y="212" text-anchor="middle" class="sch-t" style="fill:${mut}">вид сверху, вы стоите лицом к двери</text>
-      </svg>`;
+      const nm = $("[data-ik-paint-name]", body);
+      if (nm) nm.textContent = paintLabel(curPaint());
+      const hero = $("[data-ik-hero]", body);
+      if (hero) { hero.className = heroCls(r.hex); hero.style.setProperty("--sw", r.hex || "#C9A46E"); }
     }
 
     // ---------- шаги: разметка ----------
-    const textRow = (f, opt, extra = "") => `
-      <label class="ik-text"><span class="ik-text-l">${esc(T.fields[f])}${opt ? `<span class="row-sub"> · ${esc(T.optional)}</span>` : ""}</span>
+    const textRow = (f, sub = "", extra = "") => `
+      <label class="ik-text"><span class="ik-text-l">${esc(T.fields[f])}${sub ? `<span class="row-sub"> · ${esc(sub)}</span>` : ""}</span>
       <input type="text" data-f="${f}" value="${esc(d[f])}" placeholder="${esc(T.ph[f] || "")}" autocomplete="off" ${extra}></label>`;
     const numRow = (f, label, sub, val) => `
       <div class="row row-big ik-num" data-row="${f}">
         <label class="big-label" for="ik-${f}">${esc(label)}<span class="row-sub">${esc(sub)}</span></label>
         <div class="big-line"><div class="big-input"><input id="ik-${f}" data-f="${f}" data-num type="text" inputmode="decimal" autocomplete="off" spellcheck="false" enterkeyhint="done" value="${esc(val)}" placeholder="${esc(T.ph.number)}"><span class="unit" aria-hidden="true">${esc(T.mm)}</span></div></div>
       </div>`;
-    // Окно съёмки — главное на шаге: большое поле под фото, на телефоне занимает бо́льшую часть экрана
-    function mediaHTML(step) {
-      const S = T.steps[step], photos = stepMedia(step), max = maxPhotos(step), last = photos[photos.length - 1];
+    // Окно съёмки — большое поле под фото: общий план и снимок примерки
+    const thumb = (m, alt) => `<div class="ik-th"><img src="${m.url}" alt="${esc(alt)}" data-ik-zoom-open="${m.id}"><button type="button" class="ik-th-x" data-ik-rm="${m.id}" aria-label="${esc(T.media.remove)}">${icon("close")}</button></div>`;
+    const capNotes = (slot) => (st.capSlot !== slot ? "" :
+      (st.capBusy ? `<p class="ik-cap-busy" role="status"><span class="ik-spin" aria-hidden="true"></span>${esc(st.capBusy)}</p>` : "") +
+      (st.capMsg ? `<div class="banner banner-warn banner-in" role="alert">${icon("warn", "b-ico")}<span>${esc(st.capMsg)}</span></div>` : ""));
+    function mediaHTML(slot) {
+      const S = T.slots[slot], photos = stepMedia(slot), max = maxPhotos(slot), last = photos[photos.length - 1];
       const busy = st.capBusy ? "disabled" : "", full = photos.length >= max ? "disabled" : "";
       const k0 = S.gallery ? "photo-g" : "photo";   // примерка — снимок экрана из галереи
-      const th = (m) => `<div class="ik-th"><img src="${m.url}" alt="${esc(S.media)}" data-ik-zoom-open="${m.id}"><button type="button" class="ik-th-x" data-ik-rm="${m.id}" aria-label="${esc(T.media.remove)}">${icon("close")}</button></div>`;
       const shot = last
         ? `<button type="button" class="ik-shot ik-shot-has" data-ik-zoom-open="${last.id}" aria-label="${esc(T.media.zoomAria)}"><img src="${last.url}" alt="${esc(S.media)}"></button>`
         : `<button type="button" class="ik-shot" data-ik-cap="${k0}" ${busy}><span class="ik-shot-ico" aria-hidden="true">${icon(S.gallery ? "gallery" : "camera")}</span><span class="ik-shot-t">${esc(S.shot || S.media)}</span></button>`;
-      return `<div class="group group-gap ik-media" data-ik-media="${step}">
+      return `<div class="group group-gap ik-media" data-ik-media="${slot}">
         ${shot}
-        ${photos.length > 1 ? `<div class="ik-thumbs">${photos.map(th).join("")}</div>` : ""}
-        ${st.capBusy ? `<p class="ik-cap-busy" role="status"><span class="ik-spin" aria-hidden="true"></span>${esc(st.capBusy)}</p>` : ""}
-        ${st.capMsg ? `<div class="banner banner-warn banner-in" role="alert">${icon("warn", "b-ico")}<span>${esc(st.capMsg)}</span></div>` : ""}
+        ${photos.length > 1 ? `<div class="ik-thumbs">${photos.map((m) => thumb(m, S.media)).join("")}</div>` : ""}
+        ${capNotes(slot)}
         ${photos.length ? `<div class="ik-cap-row">
           ${S.gallery ? "" : `<button type="button" class="btn-plain ik-cap" data-ik-cap="photo" ${busy} ${full}>${icon("camera")}<span>${esc(T.media.more)}</span></button>`}
           <button type="button" class="btn-plain ik-cap" data-ik-cap="photo-g" ${busy} ${full}>${icon("gallery")}<span>${esc(T.media.gallery)}</span></button>
@@ -768,46 +816,128 @@ export function createIntake() {
         </div>` : S.gallery ? "" : `<div class="ik-cap-row"><button type="button" class="btn-plain ik-cap" data-ik-cap="photo-g" ${busy}>${icon("gallery")}<span>${esc(T.media.gallery)}</span></button></div>`}
       </div>`;
     }
+    // Строка снимков под маленьким окном: миниатюры с удалением, «ещё фото», галерея, счёт
+    function moreRow(slot, alt) {
+      const photos = stepMedia(slot), max = maxPhotos(slot), busy = st.capBusy ? "disabled" : "", full = photos.length >= max ? "disabled" : "";
+      return `<div class="ik-mmore"><div class="ik-strip">${photos.map((m) => thumb(m, alt)).join("")}</div>
+        <button type="button" class="ik-mbtn" data-ik-cap="photo" ${busy} ${full} aria-label="${esc(T.media.more)}">${icon("camera")}</button>
+        <button type="button" class="ik-mbtn" data-ik-cap="photo-g" ${busy} ${full} aria-label="${esc(T.media.gallery)}">${icon("gallery")}</button>
+        <span class="ik-cap-n row-sub num-tab">${esc(T.media.count(photos.length, max))}</span></div>`;
+    }
+    // Замер на шаге «Замеры»: слева снимок рулетки, справа число. Три таких строки на одном экране
+    function slotHTML(slot) {
+      const S = T.slots[slot], photos = stepMedia(slot), last = photos[photos.length - 1], busy = st.capBusy ? "disabled" : "";
+      const shot = last
+        ? `<button type="button" class="ik-mshot ik-mshot-has" data-ik-zoom-open="${last.id}" aria-label="${esc(T.media.zoomAria)}"><img src="${last.url}" alt="${esc(S.media)}"></button>`
+        : `<button type="button" class="ik-mshot" data-ik-cap="photo" ${busy} aria-label="${esc(S.shot)}">${icon("camera")}</button>`;
+      return `<div class="group group-gap ik-media ik-mrow" data-ik-media="${slot}">
+        <div class="ik-mtop">${shot}<div class="ik-mnum">${numRow(slot, S.label, S.sub, d[slot])}</div>
+          ${photos.length ? "" : `<button type="button" class="ik-mbtn" data-ik-cap="photo-g" ${busy} aria-label="${esc(T.media.gallery)}">${icon("gallery")}</button>`}</div>
+        ${photos.length ? moreRow(slot, S.media) : ""}${capNotes(slot)}
+      </div>`;
+    }
+    // «Где ещё нужен пандус»: необязательная строка под общим планом; подпись появляется вместе с первым снимком
+    function extraHTML() {
+      const S = T.slots.extra, photos = stepMedia("extra"), busy = st.capBusy ? "disabled" : "", full = photos.length >= maxPhotos("extra") ? "disabled" : "";
+      return `<div class="group group-gap ik-media ik-mrow ik-xrow" data-ik-media="extra">
+        <div class="ik-mtop"><button type="button" class="ik-mshot ik-mshot-add" data-ik-cap="photo" ${busy} ${full} aria-label="${esc(S.shot)}">${icon("plus")}</button>
+          <div class="ik-xt"><b>${esc(S.title)}</b><span>${esc(S.sub)}</span></div>
+          ${photos.length ? "" : `<button type="button" class="ik-mbtn" data-ik-cap="photo-g" ${busy} aria-label="${esc(T.media.gallery)}">${icon("gallery")}</button>`}</div>
+        ${photos.length ? moreRow("extra", S.media) : ""}${capNotes("extra")}
+        ${photos.length || d.extraNote.trim() ? `<label class="ik-text"><span class="ik-text-l">${esc(S.note)}</span><textarea data-f="extraNote" rows="2" placeholder="${esc(S.notePh)}">${esc(d.extraNote)}</textarea></label>` : ""}
+      </div>`;
+    }
+    const slotView = (slot) => (STEP_SLOTS.measure.includes(slot) ? slotHTML(slot) : slot === "extra" ? extraHTML() : mediaHTML(slot));
     function fitInput(inp) {
       const v = inp.value;
       inp.style.width = v ? `${v.length + 0.35}ch` : `${Math.max(1, inp.placeholder.length) * 0.5 + 0.4}ch`;   // подсказка мельче цифр
     }
     const banner = (lvl, text) => `<div class="banner banner-${lvl}" role="${lvl === "err" ? "alert" : "status"}">${icon(lvl === "err" ? "error" : lvl === "warn" ? "warn" : "ok", "b-ico")}<span>${esc(text)}</span></div>`;
 
+    // ---------- точка объекта на карте (шаг «Объект»): необязательная, шаги не держит ----------
+    const geoIco = {
+      me: '<path d="M20.2 3.8 3.9 10.5l6.8 2.8 2.8 6.8z" style="fill:none;stroke:currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>',
+      plus: '<path d="M12 5.5v13M5.5 12h13" style="fill:none;stroke:currentColor" stroke-width="2.2" stroke-linecap="round"/>',
+      minus: '<path d="M5.5 12h13" style="fill:none;stroke:currentColor" stroke-width="2.2" stroke-linecap="round"/>',
+    };
+    const gIcon = (n) => `<svg class="ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false">${geoIco[n]}</svg>`;
+    const geoVal = () => GEO.fmtCoord(GEO.geoPoint(d.geo)) || T.geo.none;
+    function geoHTML() {
+      const G = T.geo, has = !!GEO.geoPoint(d.geo);
+      return `<div class="group group-gap"><div class="gm-geo" data-ik-geo>
+        <div class="gm-geo-head"><span class="ik-text-l gm-geo-l">${esc(G.label)}<span class="row-sub"> · ${esc(T.optional)}</span></span><span class="gm-geo-val" data-ik-geo-val>${esc(geoVal())}</span></div>
+        <div class="gm-geo-map" data-ik-geo-map><p class="gm-geo-wait" data-ik-geo-wait>${esc(G.wait)}</p></div>
+        <div class="gm-geo-acts">
+          <button type="button" class="btn-plain" data-ik-geo-me>${gIcon("me")}<span>${esc(G.me)}</span></button>
+          <button type="button" class="btn-plain" data-ik-geo-clear ${has ? "" : "hidden"}><span>${esc(G.clear)}</span></button>
+        </div>
+        <p class="gm-geo-note" data-ik-geo-note role="status">${esc(st.geoNote || G.hint)}</p>
+      </div></div>`;
+    }
+    let geoView = null, geoSeq = 0;
+    function geoStop() { geoSeq++; if (geoView) { try { geoView.destroy(); } catch {} geoView = null; } }
+    function geoPaint(note) {
+      const v = $("[data-ik-geo-val]", body), c = $("[data-ik-geo-clear]", body), n = $("[data-ik-geo-note]", body);
+      if (v) v.textContent = geoVal();
+      if (c) c.hidden = !GEO.geoPoint(d.geo);
+      if (n && note !== undefined) { st.geoNote = note; n.textContent = note || T.geo.hint; }
+    }
+    function geoSet(g, note = "") {
+      d.geo = g ? GEO.geoPoint(g) : null; save();
+      if (geoView) geoView.placePoint(d.geo, { pan: !!(g && g.src === "gps") });
+      geoPaint(note);
+    }
+    function geoStart() {
+      const el = $("[data-ik-geo-map]", body); if (!el) return;
+      const seq = ++geoSeq, g = GEO.geoPoint(d.geo);
+      const night = doc.documentElement.dataset.mood === "night" || doc.documentElement.dataset.theme === "dark";
+      GEOMAP.createView(el, {
+        center: g ? [g.lat, g.lng] : GEO.CENTER, zoom: g ? 17 : 13, wheel: false, night, base: GEOMAP.baseKey(GEOMAP.savedBase()),
+        onPlace: (p) => geoSet({ ...p, src: "tap" }),
+      }).then((view) => {
+        if (seq !== geoSeq || !el.isConnected) { try { view.destroy(); } catch {} return; }
+        geoView = view;
+        $("[data-ik-geo-wait]", el)?.remove();
+        const z = doc.createElement("div"); z.className = "gm-geo-zoom";
+        z.innerHTML = `<button type="button" data-ik-geo-zoom="1" aria-label="${esc(T.geo.zoomIn)}">${gIcon("plus")}</button><button type="button" data-ik-geo-zoom="-1" aria-label="${esc(T.geo.zoomOut)}">${gIcon("minus")}</button>`;
+        el.appendChild(z);
+        if (g) view.placePoint(g);
+      }).catch(() => { if (seq === geoSeq) { const w = $("[data-ik-geo-wait]", el); if (w) w.textContent = T.geo.fail; } });
+    }
+    function geoLocate() {
+      if (!navigator.geolocation) return geoPaint(T.geo.geoNone);
+      geoPaint(T.geo.locating);
+      navigator.geolocation.getCurrentPosition((p) => {
+        const g = GEO.geoPoint({ lat: p.coords.latitude, lng: p.coords.longitude, src: "gps", acc: p.coords.accuracy });
+        if (!g) return geoPaint(T.geo.geoFail);
+        geoSet(g, T.geo.gps(g.acc ?? null));
+      }, (e) => geoPaint(e && e.code === 1 ? T.geo.geoDenied : T.geo.geoFail), { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 });
+    }
+
     function stepHTML(id) {
       const S = T.steps[id], v = values(d);
       let o = `<h2 class="ik-title" tabindex="-1" data-ik-h>${esc(S.title)}</h2>${S.lead ? `<p class="ik-lead">${esc(S.lead)}</p>` : ""}`;
-      if (id === "who") {
-        o += `<div class="group ik-roles" role="radiogroup" aria-label="${esc(T.fields.role)}">` +
-          T.roles.map((r) => `<button type="button" class="row ik-role" role="radio" aria-checked="${d.role === r.v}" data-ik-role="${r.v}"><span>${esc(r.t)}</span>${icon("check", "ik-ck")}</button>`).join("") + `</div>` +
-          (d.role === "other" ? `<div class="group group-gap">${textRow("roleOther", true)}</div>` : "") +
-          `<div class="group group-gap">${textRow("name", false, 'autocomplete="name"')}${textRow("contact", true, 'inputmode="text" autocomplete="tel"')}</div>` +
-          `<div class="group group-gap">${textRow("object", false)}${textRow("address", false, 'autocomplete="street-address"')}${textRow("entrance", true)}</div>`;
-      } else if (id === "overview") {
-        o += mediaHTML(id);
-      } else if (id === "extra") {
-        o += mediaHTML(id) +
-          `<div class="group group-gap"><label class="ik-text"><span class="ik-text-l">${esc(S.note)}</span><textarea data-f="extraNote" rows="2" placeholder="${esc(S.notePh)}">${esc(d.extraNote)}</textarea></label></div>`;
-      } else if (id === "free") {
-        const W = T.steps.width, shown = d.width.trim() ? d.width : num(v.width);
+      if (id === "overview") {
+        o += mediaHTML("overview"); // «Где ещё нужен пандус» убрано с первого шага (Алхас, 26.11)
+      } else if (id === "measure") {
+        const W = T.slots.width, shown = d.width.trim() ? d.width : num(v.width);
         const same = v.freeWidth != null && v.width === v.freeWidth;
-        o += mediaHTML(id) + `<div class="group group-gap">${numRow("free", S.label, S.sub, d.free)}</div>` +
-          `<div class="group">${numRow("width", W.label, W.sub, shown)}` +
+        o += `<button type="button" class="group ik-howbtn" data-ik-how-open><span class="ik-howbtn-ico" aria-hidden="true">${icon("play")}</span><span class="ik-howbtn-t">${esc(T.how.open)}<span>${esc(T.how.sub)}</span></span></button>` +
+          STEP_SLOTS.measure.map(slotHTML).join("") +
+          `<div class="group group-gap">${numRow("width", W.label, W.sub, shown)}` +
           `<button type="button" class="row row-action" data-ik-fit ${v.freeWidth == null ? "hidden" : ""} ${same ? "disabled" : ""}>${esc(same ? T.fitDone(num(v.freeWidth)) : T.fitFree(num(v.freeWidth ?? 0)))}</button></div>` +
           `<div class="issues" data-ik-issues></div>` +
-          `<div class="group group-gap"><div class="cell-schema" role="img" aria-label="Вид сверху: свободная ширина между наличниками в месте, где пандус встанет к ступени">${planSVG("free", v)}</div></div>`;
-      } else if (id === "hl" || id === "hr") {
-        o += mediaHTML(id) +
-          `<div class="group group-gap">${numRow(id, S.label, S.sub, d[id])}</div>` +
-          `<div class="issues" data-ik-issues></div>` +
-          `<p class="sec-f ik-narrow">${esc(T.narrow)}</p>` +
-          `<div class="group group-gap"><div class="cell-schema" role="img" aria-label="Вид сверху: точка ${id === "hl" ? "А на левом" : "Б на правом"} краю пандуса в линии примыкания">${planSVG(id, v)}</div></div>`;
-      } else if (id === "check") {
-        o += checkHTML();
+          `<p class="sec-f ik-narrow">${esc(T.narrow)} ${esc(T.asIs)}</p>`;
       } else if (id === "fit") {
         o += paintHTML() +
           `<div class="group group-gap"><button type="button" class="row row-action ik-ar" data-ik-ar>${icon("cube")}<span>${esc(T.ar.open)}</span></button></div>` +
-          `<p class="ik-send-note" data-ik-ar-note role="status"></p>` + mediaHTML(id);
+          `<p class="ik-send-note" data-ik-ar-note role="status"></p>` + mediaHTML("fit");
+      } else if (id === "who") {
+        // человек просто представляется: имя (фамилия по желанию) и телефон; списка ролей нет (Алхас, 2026-11-25)
+        o += `<div class="group">${textRow("name", T.fields.nameSub, 'autocomplete="name"')}${textRow("contact", T.fields.contactSub, 'inputmode="text" autocomplete="tel"')}</div>` +
+          `<div class="ik-sum-h"><span>${esc(T.where)}</span></div>` +
+          `<div class="group">${textRow("object")}${textRow("address", "", 'autocomplete="street-address"')}</div>` +
+          geoHTML();
       } else if (id === "send") {
         o += sendHTML();
       }
@@ -826,17 +956,19 @@ export function createIntake() {
       return `<div class="group">${rows.map(([k, v]) => `<div class="row row-kv"><span>${esc(k)}</span><span class="kv-v c2 num-tab">${esc(v)}</span></div>`).join("")}</div>` +
         (m.issues.length ? `<div class="issues">${m.issues.map((x) => banner(x.level === "error" ? "err" : "warn", x.text)).join("")}</div>` : "");
     }
+    // «Итоговая анкета»: сначала рассчитанный пандус, ниже всё, что человек ввёл, с кнопкой «Изменить»
     function sendHTML() {
-      const v = values(d), S = T.send, all = MEDIA_STEPS.flatMap(stepMedia);
+      const v = values(d), S = T.send, L = T.slots, all = MEDIA_STEPS.flatMap(stepMedia);
       const grp = (title, step, rows) => `<div class="ik-sum-h"><span>${esc(title)}</span><button type="button" class="ik-edit" data-ik-goto="${STEPS.indexOf(step)}">${esc(S.edit)}</button></div>` +
         `<div class="group">${rows.filter(Boolean).map(([k, val]) => `<div class="row row-kv"><span>${esc(k)}</span><span class="kv-v c2">${esc(val || "—")}</span></div>`).join("")}</div>`;
-      return grp(S.who, "who", [[T.fields.role, roleText(d)], [T.fields.name, d.name.trim()], [T.fields.contact, d.contact.trim()]]) +
-        grp(S.obj, "who", [[T.fields.object, d.object.trim()], [T.fields.address, d.address.trim()], [T.fields.entrance, d.entrance.trim()]]) +
-        grp(T.paint.row, "fit", [[T.paint.row, (() => { const r = paintRecord(curPaint(), paints); return r.hex ? [r.ral, r.name].filter(Boolean).join(" · ") : T.paint.rawName; })()]]) +
-        grp(S.measure, "free", [[T.steps.free.label, v.freeWidth != null ? `${d.free.trim()} мм` : ""], [T.steps.width.label, v.width != null ? `${num(v.width)} мм` : ""], [T.steps.hl.label, v.hl != null ? `${d.hl.trim()} мм` : ""], [T.steps.hr.label, v.hr != null ? `${d.hr.trim()} мм` : ""], [S.photos, String(all.length)]]) +
+      return `<div class="ik-sum-h"><span>${esc(S.ramp)}</span></div>` + checkHTML() +
+        grp(S.who, "who", [[T.fields.name, d.name.trim()], [T.fields.contact, d.contact.trim()]]) +
+        grp(S.obj, "who", [[T.fields.object, d.object.trim()], [T.fields.address, d.address.trim()], d.entrance.trim() ? [T.fields.entrance, d.entrance.trim()] : null, GEO.geoPoint(d.geo) ? [T.geo.sum, GEO.fmtCoord(GEO.geoPoint(d.geo))] : null]) +
+        grp(T.paint.row, "fit", [[T.paint.row, paintLabel(curPaint())]]) +
+        grp(S.measure, "measure", [[L.hl.label, v.hl != null ? `${d.hl.trim()} мм` : ""], [L.free.label, v.freeWidth != null ? `${d.free.trim()} мм` : ""], [L.hr.label, v.hr != null ? `${d.hr.trim()} мм` : ""], [L.width.label, v.width != null ? `${num(v.width)} мм` : ""], [S.photos, String(all.length)]]) +
         (() => {
           const ns = userNotes(d);
-          return ns.length ? `<div class="ik-sum-h"><span>${esc(S.notes)}</span></div><div class="group">${ns.map((n) => `<div class="row row-kv"><span>${esc(T.steps[n.step]?.short || "")}</span><span class="kv-v c2">${esc(n.text)}</span></div>`).join("")}</div>` : "";
+          return ns.length ? `<div class="ik-sum-h"><span>${esc(S.notes)}</span></div><div class="group">${ns.map((n) => `<div class="row row-kv"><span>${esc(T.steps[n.step]?.short || T.slots[n.step]?.short || "")}</span><span class="kv-v c2">${esc(n.text)}</span></div>`).join("")}</div>` : "";
         })() +
         `<div class="group group-gap"><label class="ik-text"><span class="ik-text-l">${esc(T.fields.comment)}</span><textarea data-f="comment" rows="2" placeholder="${esc(T.ph.comment)}">${esc(d.comment)}</textarea></label></div>` +
         `<p class="ik-send-note" data-ik-send-note role="status">${esc(st.sendNote)}</p>`;
@@ -854,6 +986,9 @@ export function createIntake() {
       if (ok && s.photoCount && s.photosStored < s.photoCount) o += `<p class="ik-lead c2">${esc(s.photosStored ? S.photosSaved(s.photosStored, s.photoCount) : S.photosLocal)}</p>`;
       o += `</div><div class="group group-gap"><button type="button" class="row row-action ik-dl" data-ik-dl>${icon("download")}<span>${esc(S.download)}</span></button></div>` +
         `<p class="ik-send-note" data-ik-dl-note role="status"></p>`;
+      // замер начат с карты доступности: обычная ссылка обратно, без автоперехода (адрес проверен в applyPrefill)
+      const back = GEO.safeReturn(d.returnUrl, location.origin);
+      if (back) o += `<div class="group group-gap"><a class="row row-action ik-dl ik-back-map" href="${esc(back)}" rel="noopener">${icon("back")}<span>${esc(S.backToMap)}</span></a></div>`;
       return o;
     }
 
@@ -879,34 +1014,60 @@ export function createIntake() {
         nav.innerHTML = `<button type="button" class="btn-plain" data-ik-act="again">${esc(T.send.again)}</button><button type="button" class="btn-filled" data-ik-act="close"><span>${esc(T.send.toApp)}</span></button>`;
         return;
       }
-      const id = curStep(), c = stepCheck(id, d, stepMedia(id).length), last = id === "send";
+      const id = curStep(), c = stepCheck(id, d, stepCount(id, counts())), last = id === "send";
       const inv = $("[data-ik-invite]");
       inv.hidden = false;
       inv.innerHTML = `<button type="button" class="ik-invite" data-ik-voice aria-label="${esc(T.ai.open)}"><span class="ik-ai-av" aria-hidden="true">${icon("spark")}</span><span class="ik-invite-t"><span class="ik-invite-n">${esc(T.ai.name)}</span><span class="ik-invite-s">${esc(T.ai.invite[id] || T.ai.tapMic)}</span></span><span class="ik-invite-mic" aria-hidden="true">${icon("mic")}</span></button>`;
       reason.textContent = c.ok ? c.warn : c.reason;
       reason.className = "ik-reason" + (c.ok ? (c.warn ? " is-warn" : "") : " is-block");
-      const nextLabel = last ? (st.sending ? T.send.sending : T.send.submit) : STEPS[d.step + 1] === "send" ? T.toSend : T.next;
+      const nextLabel = last ? (st.sending ? T.send.sending : T.send.submit) : T.next;
       nav.innerHTML = `<button type="button" class="btn-plain" data-ik-act="back" ${d.step === 0 ? "disabled" : ""}>${icon("back")}<span>${esc(T.back)}</span></button>` +
         `<button type="button" class="btn-filled" data-ik-act="${last ? "submit" : "next"}" aria-disabled="${!c.ok || st.sending}" ${st.sending ? "disabled" : ""}><span>${esc(nextLabel)}</span>${last ? "" : icon("chev")}</button>`;
       const iss = $("[data-ik-issues]");
       if (iss) iss.innerHTML = c.rule ? banner("err", c.warn || c.reason) : "";
-      $$("[data-row]", body).forEach((r) => r.classList.toggle("row-missing", !c.ok && !!st.tried[id] && r.dataset.row === id && !String(d[id] || "").trim()));
+      $$("[data-row]", body).forEach((r) => r.classList.toggle("row-missing", !c.ok && !!st.tried[id] && r.dataset.row === (c.slot || id) && !String(d[r.dataset.row] || "").trim()));
       reason.classList.toggle("is-quiet", !c.ok && !c.rule && !st.tried[id]);
       $$("input[data-num]", body).forEach(fitInput);
     }
     function renderBody(focus) {
+      geoStop(); closeHow();
       body.innerHTML = st.view === "resume" ? resumeHTML() : st.view === "done" ? doneHTML() : stepHTML(curStep());
-      const peek = st.view === "step" && (curStep() === "check" || curStep() === "fit");
+      if (st.open && st.view === "step" && curStep() === "who") geoStart();
+      const peek = withScene && st.view === "step" && curStep() === "fit";
       box.classList.toggle("ik-peek", peek);
       root.classList.toggle("ik-peek-on", st.open && peek);
       body.scrollTop = 0;
       if (focus) requestAnimationFrame(() => $("[data-ik-h]", body)?.focus({ preventScroll: true }));
     }
     function render(focus) { renderProg(); renderBody(focus); renderNav(); renderAI(); }
-    function renderMedia() {
-      const id = curStep(), el = $(`[data-ik-media="${id}"]`, body);
-      if (el) el.outerHTML = mediaHTML(id);
+    // Перерисовать снимки одного слота (после съёмки или удаления); набранное в поле остаётся под пальцем
+    function renderMedia(slot = st.capSlot || (STEP_SLOTS[curStep()] || [])[0]) {
+      const el = slot ? $(`[data-ik-media="${slot}"]`, body) : null;
+      if (el) {
+        const a = doc.activeElement, f = a && el.contains(a) ? a.dataset?.f : null;
+        el.outerHTML = slotView(slot);
+        if (f) $(`[data-f="${f}"]`, body)?.focus({ preventScroll: true });
+      }
       renderNav(); renderProg(); renderQuick();
+    }
+    // ---------- показ «Как замерить» поверх шага ----------
+    const HOW = createHowto();
+    let how = null;
+    function openHow() {
+      const el = $("[data-ik-how]"); if (!el.hidden) return;
+      el.hidden = false; box.classList.add("ik-how-on");
+      const start = () => { if (!el.hidden && !how) how = HOW.mount($("[data-ik-how-sc]"), { autoplay: true }); };
+      // В режиме мастера three.js при старте не грузится: показ подгружает его сам, один раз
+      if (typeof window !== "undefined" && !window.THREE && typeof h.loadThree === "function") Promise.resolve(h.loadThree()).then(start, start);
+      else start();
+      $("[data-ik-how-close]").focus({ preventScroll: true });
+    }
+    function closeHow() {
+      const el = $("[data-ik-how]"); if (!el || el.hidden) return false;
+      if (how) { how.destroy(); how = null; }
+      el.hidden = true; box.classList.remove("ik-how-on");
+      $("[data-ik-how-open]", body)?.focus({ preventScroll: true });
+      return true;
     }
 
     // ---------- помощник ----------
@@ -971,12 +1132,12 @@ export function createIntake() {
       requestAnimationFrame(() => $("[data-ik-voice]")?.focus({ preventScroll: true }));
     }
     function renderQuick() {
-      const id = st.view === "done" ? "send" : curStep(), has = stepMedia(id).length > 0;
+      const id = st.view === "done" ? "send" : curStep(), has = stepPhotos(id).length > 0;
       const qs = st.sample ? (T.ai.quick[id] || []).filter(([k]) => k !== "issues" || getModel().issues.length) : [];
       $("[data-ik-quick]").innerHTML = qs.map(([k, label]) => {
         const needAI = k !== "how", needM = k === "check" || k === "read";
         const dis = st.busy || (needAI && !st.sample) || (needM && (!has || !st.imagesOK));
-        const lbl = k === "check" && d.mode === "video" && stepMedia(id).some((m) => m.kind === "frame") ? T.ai.checkVideo : label;
+        const lbl = k === "check" && d.mode === "video" && stepPhotos(id).some((m) => m.kind === "frame") ? T.ai.checkVideo : label;
         return `<button type="button" class="ik-chip" data-ik-quick-k="${k}" ${dis ? "disabled" : ""} ${needM && !has ? `title="${esc(T.ai.needMedia)}"` : ""}>${esc(lbl)}</button>`;
       }).join("");
     }
@@ -1023,18 +1184,20 @@ export function createIntake() {
       if (!st.sample) {
         // без ИИ: сказанное — заметка; если в нём одно число на шаге с полем, предлагаем взять его в поле
         pushMsg({ role: "user", content: question, step: id, ...(opt.auto ? { auto: true } : {}) });
-        const key = { hl: "hl", hr: "hr", free: "freeWidth" }[id], n = key ? spokenNumber(question) : null;
+        // на шаге «Замеры» число идёт в первое ещё пустое поле по порядку экрана: А, ширина, Б
+        const fld = id === "measure" ? STEP_SLOTS.measure.find((x) => !String(d[x] || "").trim()) : null;
+        const key = fld ? { hl: "hl", hr: "hr", free: "freeWidth" }[fld] : null, n = key ? spokenNumber(question) : null;
         pushMsg({ role: "assistant", content: T.ai.saved, step: id, local: true, ...(n ? { sug: [{ key, raw: n.raw, value: n.value }] } : {}) });
         renderAI(); return;
       }
       let list = [];
       if (opt.media && st.imagesOK) {
-        const all = stepMedia(id);
+        const all = stepPhotos(id);
         const pref = opt.prefer ? all.filter((m) => m.kind === opt.prefer) : all;
         list = (pref.length ? pref : all).slice(-st.maxImages);
       }
-      const ctx = { images: list.map((m, k) => `${k + 1} — ${m.kind === "frame" ? `кадр из видео на ${num(m.t)} с` : "фото"}`) };
-      if (id === "check" || id === "send") { const m = getModel(); ctx.summary = modelSummary(m); ctx.issues = m.issues.map((x) => x.text); }
+      const ctx = { images: list.map((m, k) => `${k + 1} — ${m.kind === "frame" ? `кадр из видео на ${num(m.t)} с` : "фото"}${T.slots[m.step] ? ` (${T.slots[m.step].short})` : ""}`) };
+      if (id === "send") { const m = getModel(); ctx.summary = modelSummary(m); ctx.issues = m.issues.map((x) => x.text); }
       const history = d.chat.filter((m) => m.content && !m.err && !m.pending && !m.local).slice(-12).map((m) => ({ role: m.role, content: m.content }));
       const ui = pushMsg({ role: "user", content: question, step: id, media: list.map((m) => m.id), ...(opt.auto ? { auto: true } : {}) });
       const ai = pushMsg({ role: "assistant", content: "", step: id, pending: true });
@@ -1076,7 +1239,7 @@ export function createIntake() {
       const label = (T.ai.quick[id] || []).find((x) => x[0] === k)?.[1] || "";
       if (k === "how") return ask(label);
       if (k === "issues") return ask(T.ai.ask.issues, { auto: true });
-      const vidFrames = d.mode === "video" && stepMedia(id).some((m) => m.kind === "frame");
+      const vidFrames = d.mode === "video" && stepPhotos(id).some((m) => m.kind === "frame");
       return ask(k === "read" ? T.ai.ask.read : T.ai.ask.check, { media: true, auto: true, prefer: vidFrames ? "frame" : null });
     }
     function takeSuggestion(i, k) {
@@ -1086,47 +1249,48 @@ export function createIntake() {
       save(); applyParams(); updateMsg(i);
       const inp = $(`input[data-f="${f}"]`, body);
       if (inp) inp.value = s.raw;
-      if (st.view === "step" && ["check", "free", "hl", "hr"].includes(curStep())) renderBody(false);
+      if (st.view === "step" && ["measure", "send"].includes(curStep())) { const y = body.scrollTop; renderBody(false); body.scrollTop = y; }
       renderNav(); renderProg();
     }
 
     // ---------- съёмка ----------
-    function pick(kind, fromAi) {
+    function pick(kind, fromAi, slot) {
       if (st.capBusy) return;
-      const id = curStep(); if (!MEDIA_STEPS.includes(id)) return;
-      if (kind.startsWith("photo") && stepMedia(id).filter((m) => m.kind === "photo").length >= maxPhotos(id)) { st.capMsg = T.media.maxPhotos(maxPhotos(id)); renderMedia(); return; }
+      const id = slot || (STEP_SLOTS[curStep()] || [])[0]; if (!MEDIA_STEPS.includes(id)) return;
+      st.capSlot = id; st.capMsg = "";
+      if (kind.startsWith("photo") && stepMedia(id).filter((m) => m.kind === "photo").length >= maxPhotos(id)) { st.capMsg = T.media.maxPhotos(maxPhotos(id)); renderMedia(id); return; }
       st.capFromAi = !!fromAi;
       const inp = $(`[data-ik-in="${kind}"]`);
       inp.value = ""; inp.click();
     }
     async function onFiles(kind, files) {
-      const id = curStep(); if (!files || !files.length || !MEDIA_STEPS.includes(id)) return;
+      const id = st.capSlot, step = curStep(); if (!files || !files.length || !MEDIA_STEPS.includes(id)) return;
       const fromAi = st.capFromAi; st.capFromAi = false;
       st.capMsg = "";
       let added = 0;
       if (kind.startsWith("photo")) {
-        st.capBusy = T.media.busyPhoto; renderMedia(); renderAI();
+        st.capBusy = T.media.busyPhoto; renderMedia(id); renderAI();
         for (const f of Array.from(files)) {
           if (stepMedia(id).filter((m) => m.kind === "photo").length >= maxPhotos(id)) { st.capMsg = T.media.maxPhotos(maxPhotos(id)); break; }
           try { const j = await toJpeg(await decodeImage(f), 1280, 0.85); addMedia(id, { kind: "photo", ...j }); added++; }
           catch { st.capMsg = T.media.badPhoto; }
         }
       } else {
-        st.capBusy = T.media.busyVideo; renderMedia(); renderAI();
+        st.capBusy = T.media.busyVideo; renderMedia(id); renderAI();
         try {
           const fr = await videoFrames(files[0]);
-          stepMedia(id).filter((m) => m.kind === "frame").forEach((m) => removeMedia(m.id));   // одно видео на шаг: новые кадры заменяют старые
+          stepMedia(id).filter((m) => m.kind === "frame").forEach((m) => removeMedia(m.id));   // одно видео на слот: новые кадры заменяют старые
           for (const x of fr) { addMedia(id, { kind: "frame", ...x }); added++; }
         } catch {
           st.capMsg = T.media.badVideo; d.mode = "photo";
         }
       }
       st.capBusy = ""; saveNow();
-      if (curStep() === id && st.view === "step") {
-        renderMedia();
-        // после снимка — к полю числа: на маленьком экране оно иначе под подвалом (кросс-аудит 09.11, К-2)
-        const f = { hl: "hl", hr: "hr", free: "free" }[id], inp = f && added ? $(`input[data-f="${f}"]`, body) : null;
-        if (inp) requestAnimationFrame(() => inp.scrollIntoView({ block: "center", behavior: "smooth" }));
+      if (curStep() === step && st.view === "step") {
+        renderMedia(id);
+        // после снимка рулетки — к полю числа этого замера, пока оно пустое
+        const inp = added && STEP_SLOTS.measure.includes(id) && !String(d[id] || "").trim() ? $(`input[data-f="${id}"]`, body) : null;
+        if (inp) requestAnimationFrame(() => { inp.scrollIntoView({ block: "center", behavior: "smooth" }); inp.focus({ preventScroll: true }); });
       }
       renderAI();
       if (fromAi && added && st.sample) quick("check");
@@ -1198,7 +1362,7 @@ export function createIntake() {
       const photos = [];
       for (const m of allMedia()) { try { photos.push({ step: m.step, kind: m.kind, t: m.t ?? null, w: m.w, h: m.h, dataUrl: await blobToDataURL(m.blob) }); } catch {} }
       if (note) note.textContent = T.send.making;
-      const labels = Object.fromEntries(STEPS.map((s) => [s, T.steps[s].short]));
+      const labels = { ...Object.fromEntries(STEPS.map((x) => [x, T.steps[x].short])), ...Object.fromEntries(MEDIA_STEPS.map((x) => [x, T.slots[x].short])) };
       let data;
       try { data = await PDF.make(req, photos.filter((p) => p.kind === "photo"), labels); }
       catch { if (note) note.textContent = T.send.pdfFail; return; }
@@ -1208,7 +1372,8 @@ export function createIntake() {
     async function reset() {
       for (const id of [...media.keys()]) removeMedia(id);
       await idb.clear();
-      d = emptyDraft(); st.lastApplied = ""; st.lastRequest = null; logEl.replaceChildren();
+      d = emptyDraft(); st.lastApplied = ""; st.lastRequest = null; st.geoNote = ""; st.capSlot = ""; st.capMsg = ""; logEl.replaceChildren();
+      if (st.prefill) { applyPrefill(d, st.prefill); st.prefill = null; }     // «Начать заново» после входа с карты: место подставляется
       saveNow();
     }
 
@@ -1216,25 +1381,44 @@ export function createIntake() {
     function go(i) {
       i = Math.max(0, Math.min(STEPS.length - 1, i));
       d.step = i; d.maxStep = Math.max(d.maxStep || 0, i);
-      st.capMsg = ""; st.view = "step";
+      st.capMsg = ""; st.capSlot = ""; st.view = "step";
       applyParams(); save(); render(true);
     }
     function next() {
-      const id = curStep(), c = stepCheck(id, d, stepMedia(id).length);
+      const id = curStep(), c = stepCheck(id, d, stepCount(id, counts()));
       if (!c.ok) {
         st.tried[id] = true; renderNav();
         const r = $("[data-ik-reason]"); r.classList.remove("shake"); void r.offsetWidth; r.classList.add("shake");
-        const inp = $("input[data-num]", body);
-        if (inp) inp.focus();
+        // к тому замеру, которого не хватает: к полю числа, а если нет снимка — к его окну
+        const row = c.slot ? $(`[data-ik-media="${c.slot}"]`, body) : null;
+        const inp = c.slot ? (stepMedia(c.slot).length ? $(`input[data-f="${c.slot}"]`, body) : null) : $("input[data-num]", body) || $("input[data-f]", body);
+        if (row) row.scrollIntoView({ block: "center", behavior: "smooth" });
+        if (inp) inp.focus({ preventScroll: !!row });
         return;
       }
       go(d.step + 1);
     }
-    function open() {
-      if (st.open) return;
+    // open(prefill): prefill = { place: { place_id, name, address, entrance, lat, lng }, returnUrl } — замер с карты.
+    // Пустой черновик сразу начинается с этим местом. Если есть начатый черновик, мастер спросит, продолжить его
+    // или начать заново: место подставится при «Начать заново». Без prefill поведение прежнее.
+    function open(prefill) {
+      if (st.open || st.opening) return;
+      const pre = prefill && typeof prefill === "object" && (prefill.place || prefill.returnUrl) ? prefill : null;
+      let fresh = false;                           // место только что подставлено: сразу к шагам, без вопроса
+      if (pre && d.sent) {                         // прошлая заявка уже отправлена: новый замер начинается сразу
+        st.prefill = pre; st.opening = true;
+        reset().catch(() => {}).then(() => { st.opening = false; show(true); });
+        return;
+      }
+      if (pre && !hasData(d)) { applyPrefill(d, pre); saveNow(); fresh = true; }
+      else if (pre && d.placeId && d.placeId === GEO.uuidOr(pre.place && pre.place.place_id)) applyPrefill(d, { returnUrl: pre.returnUrl });
+      else st.prefill = pre;
+      show(fresh);
+    }
+    function show(fresh) {
       st.open = true; st.opener = doc.activeElement;
       box.hidden = false; root.classList.add("is-intake");
-      st.view = d.sent ? "done" : hasData(d) ? "resume" : "step";
+      st.view = d.sent ? "done" : hasData(d) && !fresh ? "resume" : "step";
       if (st.view === "step") applyParams();
       render(true);
       if (st.sample === undefined) initAI();
@@ -1245,7 +1429,7 @@ export function createIntake() {
       if (st.ctl) st.ctl.abort();
       try { rec?.abort(); } catch {}
       st.listening = false; st.aiOpen = false;
-      st.open = false; box.hidden = true;
+      st.open = false; box.hidden = true; geoStop(); closeHow(); st.prefill = null;
       root.classList.remove("is-intake", "ik-peek-on");
       saveNow();
       if (typeof h.onClose === "function") h.onClose();
@@ -1271,20 +1455,24 @@ export function createIntake() {
         return;
       }
       if (b.dataset.ikGoto != null) return go(+b.dataset.ikGoto);
-      if (b.dataset.ikRole) { d.role = b.dataset.ikRole; save(); const y = body.scrollTop; renderBody(false); body.scrollTop = y; renderNav(); renderProg(); return; }
-      if (b.matches("[data-ik-fit]")) { d.width = d.free.trim(); save(); applyParams(); renderBody(false); renderNav(); return; }
-      if (b.dataset.ikCap) return pick(b.dataset.ikCap, false);
+      if (b.matches("[data-ik-how-open]")) return openHow();
+      if (b.matches("[data-ik-how-close]")) return closeHow();
+      if (b.matches("[data-ik-fit]")) { d.width = d.free.trim(); save(); applyParams(); const y = body.scrollTop; renderBody(false); body.scrollTop = y; renderNav(); return; }
+      if (b.dataset.ikCap) return pick(b.dataset.ikCap, false, b.closest("[data-ik-media]")?.dataset.ikMedia);
       if (b.matches("[data-ik-voice]")) return openVoice();
       if (b.matches("[data-ik-ai-close]")) return closeVoice();
       if (b.dataset.ikZoomOpen) return openZoom(b.dataset.ikZoomOpen);
       if (b.matches("[data-ik-zoom-close]")) return closeZoom();
       if (b.matches("[data-ik-mic]")) return st.listening ? micStop() : micStart();
-      if (b.dataset.ikRm) { removeMedia(b.dataset.ikRm); saveNow(); renderMedia(); return; }
+      if (b.dataset.ikRm) { const slot = media.get(b.dataset.ikRm)?.step; removeMedia(b.dataset.ikRm); st.capMsg = ""; saveNow(); renderMedia(slot); return; }
       if (b.dataset.ikQuickK) return quick(b.dataset.ikQuickK);
       if (b.dataset.ikSug) { const [i, k] = b.dataset.ikSug.split(":").map(Number); return takeSuggestion(i, k); }
       if (b.matches("[data-ik-dl]")) return download();
       if (b.matches("[data-ik-ar]")) return openAR();
       if (b.dataset.ikPaint != null) return setPaint(b.dataset.ikPaint || null);
+      if (b.matches("[data-ik-geo-me]")) return geoLocate();
+      if (b.matches("[data-ik-geo-clear]")) return geoSet(null, "");
+      if (b.dataset.ikGeoZoom) { if (geoView) geoView.zoomBy(+b.dataset.ikGeoZoom); return; }
     });
     body.addEventListener("input", (e) => {
       const t = e.target, f = t.dataset?.f; if (!f) return;
@@ -1330,19 +1518,20 @@ export function createIntake() {
       if (!st.open || e.key !== "Escape" || e.defaultPrevented) return;
       e.preventDefault();
       if (!$("[data-ik-zoom]").hidden) closeZoom();
+      else if (closeHow()) { /* показ закрыт */ }
       else if (st.aiOpen) closeVoice();
       else close();
     });
     mqWide.addEventListener?.("change", () => { if (st.open) renderAI(); });
 
-    restoreMedia().then(() => { if (st.open && st.view === "step") { renderMedia(); renderAI(); } });
+    restoreMedia().then(() => { if (st.open && st.view === "step") { const y = body.scrollTop; renderBody(false); body.scrollTop = y; renderNav(); renderProg(); renderAI(); } });
     return { open, close, isOpen: () => st.open, el: box };
   }
 
   return {
-    T, STEPS, MEDIA_STEPS, PHOTO_REQUIRED, maxPhotos, DB_PHOTO_PLAN, PHOTO_DOC_MAX, DOC_LIMIT,
-    parseNum, spokenNumber, userNotes, fitSize, frameCount, frameTimes, defaultWidth, newId, emptyDraft, hasData, values, draftParams,
-    AR_BASE, paintRecord, arUrl, arValues,
+    T, STEPS, MEDIA_STEPS, STEP_SLOTS, FLOW, PHOTO_REQUIRED, maxPhotos, stepCount, DB_PHOTO_PLAN, PHOTO_DOC_MAX, DOC_LIMIT,
+    parseNum, spokenNumber, userNotes, fitSize, frameCount, frameTimes, defaultWidth, newId, newUuid, emptyDraft, applyPrefill, hasData, values, draftParams,
+    AR_BASE, arBase, paintRecord, arUrl, arValues, roleText,
     stepCheck, firstBlocked, buildRequest, docBytes, parseSuggestions, visibleStream, buildPrompt, modelSummary, withTimeout,
     mount,
   };

@@ -30,12 +30,15 @@ test("в конструктор уходит только введённое; б
   assert.deepEqual(I.draftParams(draft({ free: "1000", hl: "87", hr: "70" })), { freeWidth: 1000, width: 900, hl: 87, hr: 70 });
 });
 
-test("шаг 1: обязательные поля по очереди, контакт и вход необязательны", () => {
-  assert.equal(I.stepCheck("who", draft()).reason, I.T.need.role);
-  assert.equal(I.stepCheck("who", draft({ role: "auditor" })).reason, I.T.need.name);
-  assert.equal(I.stepCheck("who", draft({ role: "auditor", name: "Аслан" })).reason, I.T.need.object);
-  assert.equal(I.stepCheck("who", draft({ role: "auditor", name: "Аслан", object: "Школа" })).reason, I.T.need.address);
-  assert.equal(I.stepCheck("who", draft({ role: "auditor", name: "Аслан", object: "Школа", address: "Сухум" })).ok, true);
+// Алхас, 2026-11-25: списка ролей нет, человек просто представляется: имя (фамилия по желанию) и телефон
+test("«Представьтесь»: роль не спрашивается; имя, объект и адрес по очереди, телефон необязателен", () => {
+  assert.equal(I.stepCheck("who", draft()).reason, I.T.need.name);
+  assert.equal(I.stepCheck("who", draft({ name: "Аслан" })).reason, I.T.need.object);
+  assert.equal(I.stepCheck("who", draft({ name: "Аслан", object: "Школа" })).reason, I.T.need.address);
+  assert.equal(I.stepCheck("who", draft({ name: "Аслан", object: "Школа", address: "Сухум" })).ok, true);
+  assert.equal(I.T.need.role, undefined);
+  assert.equal(I.roleText(draft()), "");                                   // новая заявка: роль пустая
+  assert.equal(I.roleText(draft({ role: "auditor" })), "Картограф сообщества");   // черновик прежней версии
 });
 
 test("фото входа обязательно, хотя бы одно", () => {
@@ -134,8 +137,9 @@ test("поток: начатая служебная строка не показ
 
 test("инструкция помощнику: правила, шаг и числа есть; имени, контакта и адреса нет", () => {
   const d = draft({ name: "Аслан Тестов", contact: "+7 940 123", address: "Сухум, Мира 1", free: "845", hl: "87,5" });
-  const s = I.buildPrompt(d, "hl", { images: ["1 — фото"] });
-  assert.match(s, /шаг 1 из 9/i);
+  const s = I.buildPrompt(d, "measure", { images: ["1 — фото (Высота А)"] });
+  assert.match(s, /шаг 2 из 5/i);
+  assert.match(s, /три поля: hl/);
   assert.match(s, /голосом/);
   assert.match(s, /1:6/);
   assert.match(s, /30–50 см/);
@@ -158,7 +162,8 @@ test("первый незаполненный шаг", () => {
   const all = { hl: 1, hr: 1, free: 1, overview: 1 };
   assert.equal(I.firstBlocked(ok, all), I.STEPS.length);
   assert.equal(I.firstBlocked(ok, { ...all, overview: 0 }), I.STEPS.indexOf("overview"));
-  assert.equal(I.firstBlocked(ok, { ...all, hl: 0 }), 0, "без фото высоты А дальше нельзя");
+  assert.equal(I.firstBlocked(ok, { ...all, hl: 0 }), I.STEPS.indexOf("measure"), "без фото высоты А дальше «Замеров» нельзя");
+  assert.equal(I.firstBlocked(ok, { ...all, hr: 0 }), I.STEPS.indexOf("measure"));
   assert.equal(I.firstBlocked(draft(), {}), 0);
 });
 
@@ -188,20 +193,52 @@ test("покраска для заявки: hex и RAL из списка кон�
 
 test("ссылка «Примерить в AR»: числа как введены, покраска без # или raw", () => {
   const u = new URL(I.arUrl({ hl: "87,5", hr: "70", width: "845", board: 40 }, "#102C54"));
-  assert.equal(u.origin + u.pathname, "https://goapsny-stopgap.vercel.app/ar");
+  assert.equal(u.origin + u.pathname, "https://goapsny-stopgap.vercel.app/ar.html");
   assert.deepEqual(Object.fromEntries(u.searchParams), { hl: "87,5", hr: "70", width: "845", board: "40", paint: "102C54" });
   assert.equal(new URL(I.arUrl({ hl: "90", hr: "90", width: "900", board: 40 }, null)).searchParams.get("paint"), "raw");
   assert.equal(new URL(I.arUrl({ hl: "90" }, "not-a-colour")).searchParams.get("paint"), "raw");
-  assert.equal(I.arUrl({ hl: " 90 ", hr: "", width: null, board: 45 }, "f39f18", "http://localhost:8772/"), "http://localhost:8772/ar?hl=90&board=45&paint=F39F18");
+  assert.equal(I.arUrl({ hl: " 90 ", hr: "", width: null, board: 45 }, "f39f18", "http://localhost:8772/"), "http://localhost:8772/ar.html?hl=90&board=45&paint=F39F18");
+  // примерка лежит рядом с приложением: на своём адресе и в папке внутри карты; в сборке одним файлом — запасной адрес
+  assert.equal(I.arBase("https://goapsny-stopgap.vercel.app/?measure=1", true), "https://goapsny-stopgap.vercel.app");
+  assert.equal(I.arBase("https://map.goapsny.org/zamer/?measure=1&place_id=x", true), "https://map.goapsny.org/zamer");
+  assert.equal(I.arBase("https://map.goapsny.org/zamer/index.html", true), "https://map.goapsny.org/zamer");
+  assert.equal(I.arBase("https://claude.ai/artifact/x", false), I.AR_BASE);
+  assert.equal(I.arBase("about:srcdoc", true), I.AR_BASE);
+  assert.equal(I.arUrl({ hl: "90" }, null, I.arBase("https://map.goapsny.org/zamer/", true)), "https://map.goapsny.org/zamer/ar.html?hl=90&paint=raw");
   // из черновика: Б = А, если не введена; ширина по умолчанию — из расчёта; доска — из конструктора
   const d = draft({ free: "845,5", hl: "87,5" }), model = build(I.draftParams(d));
   assert.deepEqual(I.arValues(d, model), { hl: "87,5", hr: "87,5", width: "845,5", board: model.params.board });
 });
 
-// Сценарий съёмки (Алхас, 2026-11-08): минимум 4 фото — А, Б, ширина, общий план; «глубже» необязательно
-test("сценарий фото: порядок шагов, минимум 4 снимка, необязательные доп. фото", () => {
-  assert.deepEqual(I.STEPS, ["hl", "hr", "free", "overview", "extra", "check", "fit", "who", "send"]);
-  assert.deepEqual(I.PHOTO_REQUIRED, ["hl", "hr", "free", "overview"]);
+// Пять шагов в порядке Алхаса (2026-11-25): общий план, замеры, примерка, «Представьтесь», итоговая анкета
+test("мастер в пять шагов: все замеры на одном шаге, по порядку показа А, ширина, Б", () => {
+  assert.deepEqual(I.STEPS, ["overview", "measure", "fit", "who", "send"]);
+  assert.deepEqual(I.STEP_SLOTS.measure, ["hl", "free", "hr"]);
+  assert.deepEqual(I.STEP_SLOTS.overview, ["overview", "extra"]);
+  assert.deepEqual(I.STEPS.map((s) => I.T.steps[s].title), ["Общий план", "Замеры", "Примерка", "Представьтесь", "Итоговая анкета"]);
+  const d = draft({ hl: "85", hr: "70", free: "950" }), all = { hl: 1, free: 1, hr: 1 };
+  assert.equal(I.stepCheck("measure", d, all).ok, true);
+  // чего не хватает, того и просит, и называет замер: сначала А, потом ширина, потом Б
+  let c = I.stepCheck("measure", draft(), {});
+  assert.equal(c.slot, "hl"); assert.equal(c.reason, `Высота А. ${I.T.need.photo}`);
+  c = I.stepCheck("measure", draft(), { hl: 1 });
+  assert.equal(c.slot, "hl"); assert.equal(c.reason, I.T.need.hl);
+  c = I.stepCheck("measure", draft({ hl: "85" }), { hl: 1 });
+  assert.equal(c.slot, "free"); assert.equal(c.reason, `Свободная ширина. ${I.T.need.photo}`);
+  c = I.stepCheck("measure", draft({ hl: "85", free: "950" }), { hl: 1, free: 1, hr: 1 });
+  assert.equal(c.slot, "hr"); assert.equal(c.reason, I.T.need.hr);
+  c = I.stepCheck("measure", draft({ hl: "85", free: "845", width: "900", hr: "70" }), all);
+  assert.equal(c.ok, false); assert.equal(c.slot, "free"); assert.equal(c.rule, true);       // пандус шире свободного места
+  c = I.stepCheck("measure", draft({ hl: "85", free: "950", hr: "320" }), all);
+  assert.equal(c.ok, true); assert.match(c.warn, /пригодится мастерской/);                    // слишком высокая ступень: предупреждение, не запрет
+  assert.equal(I.stepCount("measure", all), all); assert.equal(I.stepCount("overview", { overview: 2 }), 2);
+  // черновик помнит порядок шагов
+  assert.equal(draft().flow, I.FLOW);
+});
+
+// Сценарий съёмки (Алхас, 2026-11-08): минимум 4 фото — общий план, А, ширина, Б; «глубже» необязательно
+test("сценарий фото: минимум 4 снимка, необязательные доп. фото", () => {
+  assert.deepEqual(I.PHOTO_REQUIRED, ["overview", "hl", "free", "hr"]);
   for (const s of ["hl", "hr", "free"]) assert.equal(I.stepCheck(s, draft({ hl: "85", hr: "70", free: "900" }), 0).reason, I.T.need.photo, s);
   assert.equal(I.stepCheck("extra", draft(), 0).ok, true, "доп. фото не обязательны");
   assert.equal(I.stepCheck("fit", draft(), 0).ok, true, "снимок примерки не обязателен");

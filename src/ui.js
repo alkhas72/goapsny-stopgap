@@ -2,6 +2,7 @@ import { createDrawings } from "./drawings.js";
 import { createCutlist } from "./cutlist.js";
 import { createShare } from "./share.js";
 import { createPaints } from "./paints.js";
+import { createHowto } from "./howto.js";
 // Интерфейс конструктора в духе iOS: плавающее «стекло» над 3D, инспектор (компьютер) или шторка с тремя
 // положениями (телефон), сгруппированные списки, живая схема замера, чертёж боковины, рассказ «Сборка».
 // Все размеры берутся из model.dims и model.params (src/ramp.js); здесь они только выводятся и рисуются.
@@ -14,6 +15,9 @@ export function createUI(root, handlers) {
     if (typeof h[name] === "function") h[name](...a);
   };
   const doc = document;
+  // «Живая» оболочка (data-skin=living, по эталону «Суфлёр АИС») добавляет к той же разметке свои детали:
+  // переключатель настроения, цветные капсулы разделов, капсулы полноты замера, значки в плитках. Прежние оболочки их не получают.
+  const LIVING = doc.documentElement.dataset.skin === "living";
 
   // ---------- данные ----------
   const PAINTS = createPaints().list();                // палитра OSOKA — src/paints.js (одна на 3D, мастер и AR)
@@ -66,6 +70,11 @@ export function createUI(root, handlers) {
     section: '<path d="M4 4l16 16" style="stroke:currentColor" stroke-width="1.8" stroke-linecap="round" stroke-dasharray="2.4 2.6"/><path d="M5.5 9.5V5.5h4M14.5 18.5h4v-4" style="fill:none;stroke:currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 13.5 13.5 4H18a2 2 0 0 1 2 2v4.5L10.5 20H6a2 2 0 0 1-2-2z" style="fill:currentColor" opacity=".28"/>',
     cube: '<path d="M12 3 20 7.5v9L12 21l-8-4.5v-9z" style="fill:none;stroke:currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M4 7.5 12 12l8-4.5M12 12v9" style="fill:none;stroke:currentColor" stroke-width="1.7" stroke-linejoin="round"/>',
     hammer: '<path d="M4 20l8.5-8.5M10.5 6.5l4-3 6 6-3 4z" style="fill:none;stroke:currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>',
+    pin: '<path d="M12 21s-6.5-5.7-6.5-11.2a6.5 6.5 0 0 1 13 0C18.5 15.3 12 21 12 21z" style="fill:none;stroke:currentColor" stroke-width="2" stroke-linejoin="round"/><circle cx="12" cy="9.8" r="2.3" style="fill:none;stroke:currentColor" stroke-width="2"/>',
+    slope: '<path d="M3.5 18.5h17V7.5z" style="fill:none;stroke:currentColor" stroke-width="2.1" stroke-linejoin="round"/>',
+    side: '<rect x="3" y="8.5" width="18" height="7" rx="1.8" style="fill:none;stroke:currentColor" stroke-width="2.1"/><path d="M8 8.5v7M16 8.5v7" style="stroke:currentColor" stroke-width="2.1" stroke-linecap="round"/>',
+    rib: '<path d="M5 5v14M19 5v14M5 12h14" style="fill:none;stroke:currentColor" stroke-width="2.1" stroke-linecap="round"/>',
+    phone: '<rect x="7" y="3" width="10" height="18" rx="2.6" style="fill:none;stroke:currentColor" stroke-width="2"/><path d="M11 17.6h2" style="stroke:currentColor" stroke-width="2" stroke-linecap="round"/>',
   };
   const icon = (n, cls = "") => `<svg class="ico ${cls}" viewBox="0 0 24 24" aria-hidden="true" focusable="false">${ICON[n]}</svg>`;
 
@@ -112,16 +121,36 @@ export function createUI(root, handlers) {
         </div>
       </div>
     </section>
-    <div class="ui-stage" role="region" aria-label="3D-модель пандуса"></div>
+    <p class="ui-gest" data-gest hidden><span class="ui-gest-ico" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false" style="fill:none;stroke:currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 12a7.5 7.5 0 0 1 13-5.1M19.5 12a7.5 7.5 0 0 1-13 5.1"/><path d="M17.8 3.4v3.8H14M6.2 20.6v-3.8H10"/></svg></span><span data-gest-t></span></p>
+    <div class="ui-stage" role="region" aria-label="3D-модель пандуса">${LIVING ? '<div class="stage-ambient" aria-hidden="true"><div class="stage-orb-glow glow-a"></div><div class="stage-orb-glow glow-b"></div></div>' : ""}</div>
   </div>
 
-  <header class="ui-title material">
+  ${LIVING ? `<header class="ui-title lv-title">
+    <div class="lv-top">
+      <div class="lv-lockup">
+        <div class="ui-brand">GoApsny <span aria-hidden="true">·</span> Stopgap</div>
+        <div class="lv-word"><h1 class="t-large">Пандус</h1><span class="brand-spark" aria-hidden="true"></span></div>
+      </div>
+      <div class="lv-top-right">
+        <button type="button" class="mood-cycle-btn lv-shell-btn" data-shell-phone aria-label="Показать в корпусе телефона" title="Показать в корпусе телефона">${icon("phone")}<span>Телефон</span></button>
+        <button type="button" class="mood-cycle-btn" data-mood-cycle aria-label="Сменить цвет настроения" title="Сменить цвет настроения">
+          <span class="mood-sw s-sage"></span><span class="mood-sw s-orchid"></span><span class="mood-sw s-lime"></span>
+        </button>
+      </div>
+    </div>
+    <p class="ui-tag">Приставной пандус IDLab под ваш вход: замер, расчёт 1:6, сборка</p>
+    <nav class="pill-tabs" aria-label="Разделы">
+      <button type="button" class="pill-tab tab-pink" data-home aria-current="page">${icon("cube")}<span>Конструктор</span></button>
+      <button type="button" class="pill-tab tab-lime" data-intake-open>${icon("plus")}<span>Новый замер</span></button>
+    </nav>
+    <p class="ui-sub stage-status-pill num-tab"><span class="status-dot" data-sub-dot aria-hidden="true"></span><span data-sub></span></p>
+  </header>` : `<header class="ui-title material">
     <div class="ui-brand">GoApsny <span aria-hidden="true">·</span> Stopgap</div>
     <h1 class="t-large">Пандус</h1>
     <p class="ui-tag">Приставной пандус IDLab под ваш вход: замер, расчёт 1:6, сборка</p>
     <p class="ui-sub num-tab" data-sub></p>
     <button type="button" class="ik-entry" data-intake-open>${icon("plus")}<span>Новый замер</span></button>
-  </header>
+  </header>`}
 
   <div class="ui-tools material" role="toolbar" aria-label="Инструменты модели" aria-orientation="vertical">
     <button type="button" class="tool" data-tool="spin" aria-pressed="false" title="Вращать модель">${icon("spin")}<span>Вращение</span></button>
@@ -148,6 +177,7 @@ export function createUI(root, handlers) {
     <div class="ui-scroll" data-scroll>
       <div class="ui-main" data-main>
         <div class="ui-head ui-dragzone">
+          ${LIVING ? '<div class="hero-shimmer" aria-hidden="true"></div>' : ""}
           <div class="ui-head-row">
             <div class="ui-head-text">
               <div class="head-cap">Ширина × длина</div>
@@ -156,6 +186,7 @@ export function createUI(root, handlers) {
             </div>
             <button type="button" class="btn-prominent" data-story-open>${icon("steps")}<span>Сборка</span></button>
           </div>
+          ${LIVING ? '<div class="mastery-bars" data-caps role="img" aria-label="Полнота замера"><div class="m-bar"><div class="m-fill m-white"></div></div><div class="m-bar"><div class="m-fill m-pink"></div></div><div class="m-bar"><div class="m-fill m-lime"></div></div></div>' : ""}
           <div class="tiles" data-tiles></div>
         </div>
 
@@ -173,6 +204,7 @@ export function createUI(root, handlers) {
             ${bigRow("width", "Ширина пандуса", "не больше свободной", 10, "10 мм")}
             <button type="button" class="row row-action" data-fit>Взять по свободной ширине</button>
             <div class="row-ab">${abCol("hl", "А", "слева")}${abCol("hr", "Б", "справа")}</div>
+            ${LIVING ? '<div class="activity-bars" data-profile aria-hidden="true"></div>' : ""}
             <div class="row-effect" data-effect aria-live="polite"></div>
             <div class="row row-field">
               <span class="row-label" id="l-board">Доска<span class="row-sub">боковины, мм</span></span>
@@ -202,18 +234,18 @@ export function createUI(root, handlers) {
         </section>
 
         <section class="sec" aria-labelledby="h-paint">
-          <h2 class="sec-h" id="h-paint">Покраска OSOKA</h2>
+          <h2 class="sec-h" id="h-paint">Цвет</h2>
           <div class="group finish">
             <div class="finish-hero" data-finish-hero aria-hidden="true">
               <span class="finish-sheen"></span>
-              <span class="finish-meta"><span>OSOKA UR 305</span><span>2 слоя · ALSiUR</span></span>
+              <span class="finish-meta"><span>Краска в 2 слоя</span><span>против скольжения</span></span>
             </div>
             <div class="swatch-name" aria-live="polite"><span class="finish-name" data-paint-name></span><span class="finish-ral num-tab" data-paint-ral></span></div>
             <div class="swatches" role="radiogroup" aria-label="Цвет покраски" data-swatches>
               ${PAINTS.map((p, i) => `<button type="button" role="radio" aria-checked="false" tabindex="-1" class="swatch${p.hex ? "" : " swatch-raw"}" data-paint="${p.hex || ""}" data-i="${i}" aria-label="${esc(p.ral + (p.hex ? ", " + p.name : ""))}" style="--sw:${p.hex || "transparent"}"></button>`).join("")}
             </div>
           </div>
-          <p class="sec-f">Цвет на экране приблизительный. Финишный слой с наполнителем ALSiUR против скольжения.</p>
+          <p class="sec-f">Цвет на экране приблизительный. В финишном слое наполнитель против скольжения.</p>
         </section>
 
         <section class="sec" aria-labelledby="h-draw">
@@ -249,19 +281,9 @@ export function createUI(root, handlers) {
 
         <section class="sec" aria-labelledby="h-guide">
           <h2 class="sec-h" id="h-guide">Как мерить</h2>
-          <div class="group">
-            <div class="cell-schema" role="img" aria-label="Вид сверху: дверной проём с наличниками, свободная ширина между ними, пандус у ступени, точки А и Б на краях пандуса">${guideTopSVG()}</div>
-            <ol class="steps">
-              <li><span class="step-n" aria-hidden="true">1</span><span>Найдите, где пандус встанет к ступени напротив двери.</span></li>
-              <li><span class="step-n" aria-hidden="true">2</span><span>Измерьте <b>свободную ширину</b> в этом месте с учётом наличников и других выступов. Это обязательный замер.</span></li>
-              <li><span class="step-n" aria-hidden="true">3</span><span>Решите ширину пандуса: не больше свободной ширины, чтобы он встал вплотную.</span></li>
-              <li><span class="step-n" aria-hidden="true">4</span><span>Измерьте высоту ступени слева (А) и справа (Б) на краях будущего пандуса. При ширине 90 см между точками 90 см.</span></li>
-              <li><span class="step-n" aria-hidden="true">5</span><span>Введите обе высоты и ширину как есть, без округления.</span></li>
-            </ol>
-          </div>
+          <div class="group hw-host" data-howto></div>
           <div class="group group-gap">
-            <div class="cell-schema" role="img" aria-label="Вид спереди: земля под наклоном. Замер на полной ширине даёт настоящую разницу высот, замер на узкой базе 30–50 сантиметров — меньшую">${guideNarrowSVG()}</div>
-            <div class="banner banner-warn banner-in">${icon("warn", "b-ico")}<span>Не мерьте на узкой базе 30–50 см. Если земля наклонена, разница высот выйдет меньше настоящей, и пандус встанет с перекосом.</span></div>
+            <div class="banner banner-warn banner-in">${icon("warn", "b-ico")}<span>Высоты мерьте по краям будущего пандуса, не ближе друг к другу. Если земля наклонена, разница высот выйдет меньше настоящей, и пандус встанет с перекосом.</span></div>
           </div>
           <p class="sec-f">Двух высот у краёв для этой конструкции достаточно. Если свободная ширина не указана, замер считается неполным.</p>
         </section>
@@ -295,7 +317,7 @@ export function createUI(root, handlers) {
         <p class="t-foot c2 story-hint">Листайте шаги жестом влево-вправо или стрелками на клавиатуре.</p>
       </section>
     </div>
-  </aside>`;
+  </aside>${LIVING ? '<div class="lv-toast" data-toast role="status" aria-live="polite"></div>' : ""}`;
 
   const stageEl = $(".ui-stage");
   const panel = $(".ui-panel");
@@ -512,7 +534,8 @@ export function createUI(root, handlers) {
       b.setAttribute("aria-checked", on ? "true" : "false"); b.tabIndex = on ? 0 : -1;
     });
     $("[data-paint-ral]").textContent = info.hex ? `${info.ral} · ${info.hex}` : "фанера и сосна без покрытия";
-    $("[data-paint-name]").textContent = info.hex ? info.name : "Без покраски";
+    const ruName = info.ru || info.name || "";                 // название цвета по-русски, как в мастере и в примерке
+    $("[data-paint-name]").textContent = info.hex ? ruName.charAt(0).toUpperCase() + ruName.slice(1) : "Без покраски";
     const hero = $("[data-finish-hero]");
     hero.style.setProperty("--sw", info.hex || "#C9A46E");
     hero.classList.toggle("finish-raw", !info.hex);
@@ -631,46 +654,6 @@ export function createUI(root, handlers) {
       ` · настил ${d.ply.left || d.ply.length}${sk ? ` / ${d.ply.right}` : ""} · уклон ${slopeTxt(d.slope)} · доска ${num(m.params.board)}`;
   }
 
-  // ---------- схемы «Как мерить» (статичные) ----------
-  function guideTopSVG() {
-    return `<svg viewBox="0 0 340 236" width="100%" aria-hidden="true" focusable="false">
-      <rect x="0" y="0" width="340" height="44" style="fill:var(--sch-wall)"/>
-      <rect x="88" y="0" width="164" height="44" style="fill:var(--sch-open)"/>
-      <text x="170" y="14" text-anchor="middle" class="sch-t" style="fill:var(--sch-mut)">дверной проём</text>
-      <rect x="76" y="12" width="12" height="40" rx="2" style="fill:var(--sch-jamb)"/><rect x="252" y="12" width="12" height="40" rx="2" style="fill:var(--sch-jamb)"/>
-      <text x="70" y="30" text-anchor="end" class="sch-t" style="fill:var(--sch-mut)">наличник</text>
-      <g style="stroke:var(--tint-ink)" stroke-width="1.4"><line x1="90" y1="38" x2="250" y2="38"/><path d="M90 33v10M250 33v10"/></g>
-      <text x="170" y="31" text-anchor="middle" class="sch-t sch-b" style="fill:var(--tint-ink)">свободная ширина</text>
-      <rect x="96" y="44" width="148" height="122" rx="3" style="fill:var(--sch-ramp);stroke:var(--sch-ramp-edge)" stroke-width="1.6"/>
-      <text x="170" y="110" text-anchor="middle" class="sch-t sch-b" style="fill:var(--sch-ramp-ink)">пандус</text>
-      <circle cx="96" cy="44" r="10" style="fill:var(--navy-pt);stroke:var(--cell)" stroke-width="2"/><text x="96" y="48.5" text-anchor="middle" class="sch-pt">А</text>
-      <circle cx="244" cy="44" r="10" style="fill:var(--navy-pt);stroke:var(--cell)" stroke-width="2"/><text x="244" y="48.5" text-anchor="middle" class="sch-pt">Б</text>
-      <text x="84" y="72" text-anchor="end" class="sch-t" style="fill:var(--sch-ink)">высота А</text>
-      <text x="256" y="72" class="sch-t" style="fill:var(--sch-ink)">высота Б</text>
-      <g style="stroke:var(--sch-ink)" stroke-width="1.2"><line x1="96" y1="184" x2="244" y2="184"/><path d="M96 178v12M244 178v12"/></g>
-      <text x="170" y="206" text-anchor="middle" class="sch-t sch-b" style="fill:var(--sch-ink)">А–Б = ширина пандуса</text>
-      <text x="170" y="226" text-anchor="middle" class="sch-t" style="fill:var(--sch-mut)">при ширине 90 см точки в 90 см друг от друга</text>
-    </svg>`;
-  }
-  function guideNarrowSVG() {
-    // земля наклонена: z(x) = 120 - 0.1·x; ступень ровная на y = 34
-    const gy = (x) => 132 - (x - 20) * 0.11;
-    const bar = (x, cls, w) => `<line x1="${x}" y1="34" x2="${x}" y2="${gy(x).toFixed(1)}" style="stroke:${cls}" stroke-width="${w}" stroke-linecap="round"/>`;
-    return `<svg viewBox="0 0 340 196" width="100%" aria-hidden="true" focusable="false">
-      <rect x="20" y="22" width="300" height="12" rx="2" style="fill:var(--sch-wall)"/>
-      <text x="24" y="16" class="sch-t" style="fill:var(--sch-mut)">ступень ровная</text>
-      <path d="M20 ${gy(20)} L320 ${gy(320)} L320 150 L20 150 Z" style="fill:var(--sch-ground)"/>
-      <line x1="20" y1="${gy(20)}" x2="320" y2="${gy(320)}" style="stroke:var(--sch-ink)" stroke-width="1.6"/>
-      <text x="316" y="146" text-anchor="end" class="sch-t" style="fill:var(--sch-mut)">земля под наклоном</text>
-      ${bar(40, "var(--navy-pt)", 4)}${bar(300, "var(--navy-pt)", 4)}
-      <text x="48" y="96" class="sch-t sch-b" style="fill:var(--sch-ink)">А</text><text x="292" y="80" text-anchor="end" class="sch-t sch-b" style="fill:var(--sch-ink)">Б</text>
-      <g stroke-dasharray="4 3">${bar(130, "var(--red)", 2.4)}${bar(210, "var(--red)", 2.4)}</g>
-      <g style="stroke:var(--navy-pt)" stroke-width="1.2"><line x1="40" y1="166" x2="300" y2="166"/><path d="M40 161v10M300 161v10"/></g>
-      <text x="170" y="161" text-anchor="middle" class="sch-t sch-b" style="fill:var(--sch-ink)">90 см — верная разница</text>
-      <g style="stroke:var(--red)" stroke-width="1.2"><line x1="130" y1="184" x2="210" y2="184"/><path d="M130 179v10M210 179v10"/></g>
-      <text x="214" y="188" class="sch-t sch-b" style="fill:var(--red-ink)">40 см — меньше</text>
-    </svg>`;
-  }
 
   // ---------- рассказ «Сборка» ----------
   function storySteps() {
@@ -712,7 +695,7 @@ export function createUI(root, handlers) {
     } else if (id === "finish") {
       const pi = paintInfo();
       q = "Чем покрыт пандус?";
-      a = "Полиуретан OSOKA UR 305 в два слоя. В финишный слой добавлен наполнитель ALSiUR против скольжения, сверху — трафарет goapsny.org.";
+      a = "Полиуретановая краска в два слоя. В финишный слой добавлен наполнитель против скольжения, сверху — трафарет goapsny.org.";
       r("Цвет", pi.hex ? `${pi.ral} · ${pi.name}` : "без покраски"); r("Слоёв", "2");
       r("Против скольжения", "ALSiUR"); r("Трафарет", "goapsny.org");
     }
@@ -786,7 +769,7 @@ export function createUI(root, handlers) {
   const detPx = (k) => {
     const H = window.innerHeight;
     if (k === "medium" && st.story) return Math.round(H * 0.6);
-    if (k === "peek") return Math.round(Math.max(H * DET.peek, 196));
+    if (k === "peek") return LIVING ? Math.round(Math.min(Math.max(H * 0.3, 252), H * 0.5)) : Math.round(Math.max(H * DET.peek, 196));
     return Math.round(H * DET[k]);
   };
   let sheetOff = 0;
@@ -923,7 +906,7 @@ export function createUI(root, handlers) {
   function shareCode() {
     const p = st.model ? st.model.params : null;
     if (!p) return "";
-    try { return SHARE.toHashName(SHARE.encode({ ...p, paint: st.paint })); } catch (e) { return "⚠ " + (e && e.message || "код не построен"); }
+    try { return SHARE.toHashName(SHARE.encode({ ...p, paint: st.paint })); } catch (e) { return "Ошибка: " + (e && e.message || "код не построен"); }
   }
   function cutSVG(sheet) {
     const W = sheet.size.h, H = sheet.size.w;                       // лист кладём горизонтально
@@ -960,6 +943,20 @@ export function createUI(root, handlers) {
   }
   function exportNote(t) { const el = $("[data-export-note]"); el.textContent = t || ""; }
 
+  // Крупная цифра размера не перескакивает, а добегает до нового значения (живая оболочка)
+  function rollTitle(el, text) {
+    const nums = (text.match(/\d+/g) || []).map(Number), prev = st.headShown;   // старт — то, что сейчас на экране
+    cancelAnimationFrame(st.headRaf || 0);
+    const put = (vals) => { let i = 0; st.headShown = vals; el.innerHTML = esc(text.replace(/\d+/g, () => String(vals[i++]))) + "<small> мм</small>"; };
+    if (!prev || prev.length !== nums.length || mqReduce.matches || prev.every((v, i) => v === nums[i])) return put(nums);
+    const t0 = performance.now(), D = 420;
+    const step = (now) => {
+      const k = Math.min(1, (now - t0) / D), e = 1 - Math.pow(1 - k, 3);
+      put(nums.map((n, i) => Math.round(prev[i] + (n - prev[i]) * e)));
+      if (k < 1) st.headRaf = requestAnimationFrame(step);
+    };
+    st.headRaf = requestAnimationFrame(step);
+  }
   function render(m) {
     if (!m) return;
     const prev = st.model;
@@ -971,17 +968,37 @@ export function createUI(root, handlers) {
     const diff = +(Math.abs(p.hl - p.hr)).toFixed(4);
     $("[data-sub]").textContent = sk ? `А ${num(p.hl)} · Б ${num(p.hr)} · перекос ${num(diff)} мм` : `ровный ${num(p.hl)} мм`;
     // шапка шторки
-    $("[data-head-title]").textContent = `${num(d.ply.width)} × ${d.totalLen} мм`;
+    const headT = `${num(d.ply.width)} × ${d.totalLen}`;
+    if (LIVING) { const ht = $("[data-head-title]"); ht.style.setProperty("--len", headT.length + 2); rollTitle(ht, headT); }
+    else $("[data-head-title]").textContent = `${headT} мм`;
     const errs = m.issues.filter((x) => x.level === "error").length, warns = m.issues.length - errs;
     const stt = errs ? ["err", "Есть ошибка в замере"] : warns ? ["warn", "Замер неполный"] : ["ok", "Замер полный"];
     const stEl = $("[data-status]");
     stEl.className = "status status-" + stt[0];
     stEl.innerHTML = `${icon(stt[0] === "err" ? "error" : stt[0] === "warn" ? "warn" : "ok", "st-ico")}<span>${esc(stt[1])}</span>`;
-    $("[data-tiles]").innerHTML = [
-      ["Уклон", slopeTxt(d.slope)],
-      ["Боковина", `${d.left.height}${sk ? ` / ${d.right.height}` : ""}`],
-      ["Ребро", d.rib ? "есть" : "нет"],
-    ].map(([k, v]) => `<div class="tile"><span class="tile-k">${k}</span><span class="tile-v num-tab">${esc(v)}</span></div>`).join("");
+    const tileData = [
+      ["Уклон", slopeTxt(d.slope), "slope"],
+      ["Боковина", `${d.left.height}${sk ? ` / ${d.right.height}` : ""}`, "side"],
+      ["Ребро", d.rib ? "есть" : "нет", "rib"],
+    ];
+    if (LIVING) {
+      // плитка, чьё значение изменилось, коротко «подпрыгивает»
+      const was = st.tileVals || {};
+      $("[data-tiles]").innerHTML = tileData.map(([k, v, ic]) => `<div class="tile${prev && was[ic] != null && was[ic] !== v ? " pop" : ""}"><span class="tile-k">${icon(ic)}<span>${k}</span></span><span class="tile-v num-tab">${esc(v)}</span></div>`).join("");
+      st.tileVals = Object.fromEntries(tileData.map(([, v, ic]) => [ic, v]));
+      clearTimeout(st.popTimer);
+      st.popTimer = setTimeout(() => $$(".tile.pop").forEach((t) => t.classList.remove("pop")), 320);
+      const sd = $("[data-sub-dot]"); if (sd) sd.className = "status-dot " + (errs ? "error" : warns ? "loading" : "ready");
+      // три капсулы полноты замера: свободная ширина, пандус помещается, высоты А и Б
+      const free = p.freeWidth > 0, fits = free && p.width <= p.freeWidth, hs = p.hl > 0 && p.hr > 0;
+      const caps = [free ? 100 : 10, fits ? 100 : free ? 45 : 10, hs ? 100 : 10];
+      $$("[data-caps] .m-fill").forEach((f, i) => { f.style.width = caps[i] + "%"; });
+      $("[data-caps]").setAttribute("aria-label", `Полнота замера: свободная ширина ${free ? "измерена" : "не измерена"}, пандус ${fits ? "помещается" : free ? "шире свободной ширины" : "не сверен с проёмом"}, высоты А и Б ${hs ? "заданы" : "не заданы"}`);
+      // живой профиль пандуса: столбики растут от носка к ступени, высота — от порога
+      const pe = $("[data-profile]"), N = 24, k = Math.min(1, Math.max(p.hl, p.hr) / 200), g = Math.min(p.hl, p.hr) / Math.max(p.hl, p.hr, 1);
+      if (!pe.childElementCount) pe.innerHTML = Array.from({ length: N }, (_, i) => `<span class="act-bar a${i % 4}"></span>`).join("");
+      Array.from(pe.children).forEach((b, i) => { const t = (i + 1) / N; b.style.height = (5 + 21 * t * k * (i % 2 ? g : 1)).toFixed(1) + "px"; });
+    } else $("[data-tiles]").innerHTML = tileData.map(([k, v]) => `<div class="tile"><span class="tile-k">${k}</span><span class="tile-v num-tab">${esc(v)}</span></div>`).join("");
     // схема
     const sc = schemaSVG(m);
     const scEl = $("[data-schema]");
@@ -1044,13 +1061,32 @@ export function createUI(root, handlers) {
   function setPaint(hex) { st.paint = hex ? String(hex).toUpperCase() : null; syncPaint(); if (st.model) $("[data-share-code]").textContent = shareCode(); }
 
   $$("[data-intake-open]").forEach((bt) => bt.addEventListener("click", () => call("onIntake")));
+  $("[data-mood-cycle]")?.addEventListener("click", (e) => { const r = e.currentTarget.getBoundingClientRect(); call("onMood", { x: r.left + r.width / 2, y: r.top + r.height / 2 }); });
+  $("[data-shell-phone]")?.addEventListener("click", () => call("onShell", "phone"));
+  $("[data-home]")?.addEventListener("click", () => { if (st.story) openStory(null); if (mqPhone.matches) snap("peek"); scroller.scrollTo({ top: 0, behavior: mqReduce.matches ? "auto" : "smooth" }); });
+  // всплывающая капсула-сообщение (только «живая» оболочка)
+  let toastTimer = 0;
+  function toast(t) {
+    const el = $("[data-toast]"); if (!el) return;
+    el.textContent = t; el.classList.add("show");
+    clearTimeout(toastTimer); toastTimer = setTimeout(() => el.classList.remove("show"), 1600);
+  }
+  const MOOD_NAMES = { sage: "Мята", orchid: "Орхидея", lime: "Лайм", night: "Ночь" };
+  let moodSeen = false;
+  function setMood(m) {
+    const b = $("[data-mood-cycle]"); if (!b) return;
+    b.title = `Настроение: ${MOOD_NAMES[m] || m}. Сменить`;
+    if (moodSeen) toast(MOOD_NAMES[m] || m);
+    moodSeen = true;
+  }
   $$("[data-export]").forEach((bt) => bt.addEventListener("click", () => call("onExport", bt.dataset.export)));
   $("[data-copy-code]").addEventListener("click", async () => {
     const code = shareCode(), btn = $("[data-copy-code]");
     let ok = false;
-    if (code.startsWith("⚠")) return;
+    if (code.startsWith("Ошибка")) return;
     try { await navigator.clipboard.writeText(code); ok = true; } catch { ok = false; }
     btn.textContent = ok ? "Код скопирован" : "Выделите код и скопируйте вручную";
+    if (ok) toast("Код скопирован");
     setTimeout(() => { btn.textContent = "Скопировать код"; }, 2200);
   });
 
@@ -1069,6 +1105,43 @@ export function createUI(root, handlers) {
     setTimeout(() => root.classList.remove("intro"), 2600);
   }
   setTimeout(() => root.classList.add("intro-done"), 7000);
+  // «Как мерить» показом (src/howto.js): сцена ставится, когда раздел подходит к экрану, и стоит на последнем кадре до «Показать»
+  const howHost = $("[data-howto]");
+  if (howHost) {
+    const startHow = () => { if (!howHost.firstChild) createHowto().mount(howHost, { autoplay: false }); };
+    if (window.IntersectionObserver) {
+      const io = new IntersectionObserver((es) => { if (es.some((e) => e.isIntersecting)) { io.disconnect(); startHow(); } }, { root: null, rootMargin: "300px" });
+      io.observe(howHost);
+    } else startHow();
+  }
+
+  // Подсказка жестов у 3D (Алхас, 2026-11-25): без неё пандус выглядит картинкой, а не вещью, которую можно крутить.
+  // Видна, пока модель ни разу не тронули; после первого касания сцены уходит и больше не появляется
+  const GEST_KEY = "goapsny-stopgap:gest";
+  const gest = $("[data-gest]");
+  let gestSeen = false; try { gestSeen = localStorage.getItem(GEST_KEY) === "1"; } catch {}
+  if (gest && !gestSeen) {
+    const touch = matchMedia("(hover: none) and (pointer: coarse)").matches || mqPhone.matches;
+    $("[data-gest-t]").textContent = touch ? "Крутите пандус пальцем. Двумя пальцами приближайте и двигайте" : "Крутите пандус мышью. Колесо приближает, правая кнопка двигает";
+    gest.hidden = false;
+    // место: сразу над нижними кнопками модели; в мастере (шаг «Примерка») кнопок нет, подсказка лежит у нижнего края сцены
+    const viewEl = $(".ui-view"), bottomEl = $(".ui-bottom");
+    const place = () => {
+      const b = bottomEl.getBoundingClientRect(), v = viewEl.getBoundingClientRect();
+      gest.style.bottom = b.height > 0 && b.top < v.bottom ? `${Math.round(v.bottom - b.top + 10)}px` : "";
+    };
+    place();
+    const placeT = setInterval(place, 300);
+    const done = () => {
+      if (gest.classList.contains("is-out")) return;
+      clearInterval(placeT);
+      gest.classList.add("is-out"); setTimeout(() => { gest.hidden = true; }, 400);
+      try { localStorage.setItem(GEST_KEY, "1"); } catch {}
+      stageEl.removeEventListener("pointerdown", done, true); stageEl.removeEventListener("wheel", done, true);
+    };
+    stageEl.addEventListener("pointerdown", done, true); stageEl.addEventListener("wheel", done, { capture: true, passive: true });
+  }
+
   // после нажатия, а не на pointerdown: иначе подзаголовок исчезает до click и кнопка уезжает из-под пальца
   root.addEventListener("click", () => root.classList.add("intro-done"), { once: true });
 
@@ -1080,6 +1153,7 @@ export function createUI(root, handlers) {
     setPlaying,
     setPaint,
     exportNote,
+    setMood,
     setStep: (id) => openStory(id || null, false),
     setMode: (v) => { if (MODES.some((x) => x.v === v)) { st.mode = v; setSeg(modesEl, v); st.xray = v === "xray"; st.blueprint = v === "blueprint"; applySplit(); } },
   };

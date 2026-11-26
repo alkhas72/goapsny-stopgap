@@ -2,6 +2,8 @@
 <html lang="ru">
 <head>
 <meta charset="utf-8">
+<!-- Приложение может жить в папке (например /zamer/ внутри карты): все адреса относительные. Адрес папки без косой черты в конце ломает их, поэтому её добавляем. Одной строкой: сборка одним файлом (scripts/build-artifact.mjs) этот блок не берёт. -->
+<script>(function () { try { var p = location.pathname; if (!/(\/|\.html?|\/index)$/.test(p)) location.replace(p + "/" + location.search + location.hash); } catch (e) {} })();</script>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
 <meta name="theme-color" content="#F2F2F7" media="(prefers-color-scheme: light)">
@@ -12,27 +14,63 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap">
 <link rel="stylesheet" href="src/styles.css">
 <link rel="stylesheet" href="src/skin-violet.css">
+<link rel="stylesheet" href="src/skin-living.css">
+<link rel="stylesheet" href="src/skin-living-intake.css">
+<link rel="stylesheet" href="src/map.css">
+<link rel="stylesheet" href="src/howto.css">
+<link rel="stylesheet" href="src/shell.css">
 <script>
-// Сиреневая оболочка (проба дизайна) включается только адресом ?skin=violet; без него приложение выглядит как прежде
+// Оболочка приложения. По умолчанию — «живая» (по эталону «Суфлёр АИС»): data-skin=living и одно из четырёх настроений.
+// ?skin=classic — прежний вид в духе iOS, ?skin=violet — сиреневая проба от 16.11. Расчёт и разметка у всех одни.
 (function () {
   try {
-    if (new URLSearchParams(location.search).get("skin") !== "violet") return;
-    var d = document.documentElement; d.dataset.skin = "violet"; d.dataset.theme = "light";
-    var l = document.createElement("link"); l.rel = "stylesheet";
-    l.href = "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@700&family=Playfair+Display:wght@700;800;900&display=swap";
-    document.head.appendChild(l);
-    document.querySelectorAll('meta[name="theme-color"]').forEach(function (m) { m.content = "#EFE2FC"; });
+    var d = document.documentElement, q = new URLSearchParams(location.search);
+    var ls = function (k) { try { return localStorage.getItem(k); } catch (e) { return null; } };
+    // Режим мастера (?mode=wizard): только «Новый замер», без конструктора и без three.js при старте.
+    // Так мастер открывается внутри карты GoApsny (?embed=1): лёгкий, один путь для человека.
+    var wizard = q.get("mode") === "wizard";
+    if (wizard) d.dataset.mode = "wizard";
+    if (q.get("embed") === "1") d.dataset.embed = "1";
+    var skin = q.get("skin"); skin = skin === "violet" || skin === "classic" ? skin : "living";
+    if (wizard) skin = "living";
+    if (skin === "classic") return;
+    d.dataset.skin = skin;
+    var tc = function (c) { document.querySelectorAll('meta[name="theme-color"]').forEach(function (m) { m.content = c; }); };
+    if (skin === "violet") {
+      d.dataset.theme = "light";
+      var l = document.createElement("link"); l.rel = "stylesheet";
+      l.href = "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@700&family=Playfair+Display:wght@700;800;900&display=swap";
+      document.head.appendChild(l);
+      tc("#EFE2FC");
+      return;
+    }
+    // настроение: мята (по умолчанию), орхидея, лайм, ночь; выбор хранится в браузере
+    // внутри карты настроение задаёт карта (?mood=), чтобы фон у мастера и у карты был один
+    var mood = (wizard && q.get("mood")) || ls("goapsny-stopgap:mood"); if (!/^(sage|orchid|lime|night)$/.test(mood)) mood = "sage";
+    d.dataset.mood = mood; d.dataset.theme = mood === "night" ? "dark" : "light";
+    tc({ sage: "#bedec9", orchid: "#f7cbe7", lime: "#f5f9ad", night: "#182620" }[mood]);
+    if (wizard) {
+      // мастер занимает всё отведённое место: ни витрины, ни корпуса телефона
+    } else if (window.self !== window.top) {
+      // приложение внутри витрины: корпус телефона или «во весь экран» — говорит родительская страница
+      var ps = null; try { ps = window.parent.document.documentElement.dataset.shell; } catch (e) {}
+      if (ps) d.dataset.framed = ps === "full" ? "full" : "phone";
+    } else if (q.get("shell") !== "off" && matchMedia("(min-width: 541px)").matches && !matchMedia("(hover: none) and (pointer: coarse)").matches) {
+      // компьютер: витрина с корпусом телефона; на телефонах и планшетах приложение занимает экран целиком.
+      // ?shell=off открывает приложение без витрины (для проверок)
+      d.dataset.shell = ls("goapsny-stopgap:shell") === "full" ? "full" : "phone";
+    }
   } catch (e) {}
 })();
 </script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/controls/OrbitControls.js"></script>
+<!-- three.js: конструктору его грузит src/boot.js до запуска приложения, здесь только ранний заказ файлов у сети. Мастеру (?mode=wizard) он нужен лишь для показа «Как мерить» и подгружается по его открытию (src/three-load.js). Одной строкой: сборка одним файлом этот блок не берёт. -->
+<script>(function () { var ds = document.documentElement.dataset; if (ds.mode === "wizard" || ds.shell) return; ["build/three.min.js", "examples/js/controls/OrbitControls.js"].forEach(function (f) { var l = document.createElement("link"); l.rel = "preload"; l.as = "script"; l.href = "https://cdn.jsdelivr.net/npm/three@0.147.0/" + f; document.head.appendChild(l); }); })();</script>
 </head>
 <body>
 <!-- BODY:START -->
 <div id="app" class="app"></div>
 <noscript><p style="padding:24px;font:17px/1.4 -apple-system,system-ui,sans-serif">Конструктору пандусов нужен JavaScript.</p></noscript>
 <!-- BODY:END -->
-<script type="module" src="src/app.js"></script>
+<script type="module" src="src/boot.js"></script>
 </body>
 </html>
