@@ -1,5 +1,7 @@
 import { createRampsSource } from "./ramps-source.js";
 import { createRampLayers } from "./ramps-layer.js";
+// НЕ ПОДКЛЮЧЕНО с 2026-11-26: карта одна, это карта доступности GoApsny (решение Алхаса о разделении).
+// Приложение этот экран не монтирует и не грузит; файл оставлен как запас и ради чистых функций, которые проверяет tests/map.test.mjs.
 // Карта пандусов (компонент ГИС): экран карты поверх конструктора.
 // createMap().mount(root, handlers) → { open(), close(), isOpen(), refresh() }
 // handlers: onOpenRamp({ params, paint }) — открыть пандус в конструкторе;

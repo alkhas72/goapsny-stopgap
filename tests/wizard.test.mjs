@@ -69,3 +69,15 @@ test("вход в режим мастера: без document.write, three не �
   assert.match(first, /dataset\.skin/);
   assert.doesNotMatch(first, /preload/);
 });
+
+test("после разделения с картой: своей карты пандусов на пути человека нет, первый шаг без «Где ещё нужен пандус»", () => {
+  const app = read("src/app.js"), ui = read("src/ui.js"), shell = read("src/shell.js"), intake = read("src/intake.js"), build = read("scripts/build-artifact.mjs");
+  assert.doesNotMatch(app, /from "\.\/map\.js"/);
+  assert.doesNotMatch(app, /createMap/);
+  assert.match(app, /prefillFromQuery/, "вход в замер по ссылке с карты GoApsny остаётся");
+  assert.doesNotMatch(ui, /data-map-open/);
+  assert.doesNotMatch(shell, /data-go="map"/);
+  assert.doesNotMatch(build, /src\/map\.js/);
+  assert.match(intake, /o \+= mediaHTML\("overview"\);/);
+  assert.doesNotMatch(intake, /mediaHTML\("overview"\) \+ extraHTML\(\)/);
+});

@@ -141,7 +141,6 @@ export function createUI(root, handlers) {
     <p class="ui-tag">Приставной пандус IDLab под ваш вход: замер, расчёт 1:6, сборка</p>
     <nav class="pill-tabs" aria-label="Разделы">
       <button type="button" class="pill-tab tab-pink" data-home aria-current="page">${icon("cube")}<span>Конструктор</span></button>
-      <button type="button" class="pill-tab tab-dark" data-map-open>${icon("pin")}<span>Карта</span></button>
       <button type="button" class="pill-tab tab-lime" data-intake-open>${icon("plus")}<span>Новый замер</span></button>
     </nav>
     <p class="ui-sub stage-status-pill num-tab"><span class="status-dot" data-sub-dot aria-hidden="true"></span><span data-sub></span></p>
@@ -1062,7 +1061,6 @@ export function createUI(root, handlers) {
   function setPaint(hex) { st.paint = hex ? String(hex).toUpperCase() : null; syncPaint(); if (st.model) $("[data-share-code]").textContent = shareCode(); }
 
   $$("[data-intake-open]").forEach((bt) => bt.addEventListener("click", () => call("onIntake")));
-  $$("[data-map-open]").forEach((bt) => bt.addEventListener("click", () => call("onMap")));
   $("[data-mood-cycle]")?.addEventListener("click", (e) => { const r = e.currentTarget.getBoundingClientRect(); call("onMood", { x: r.left + r.width / 2, y: r.top + r.height / 2 }); });
   $("[data-shell-phone]")?.addEventListener("click", () => call("onShell", "phone"));
   $("[data-home]")?.addEventListener("click", () => { if (st.story) openStory(null); if (mqPhone.matches) snap("peek"); scroller.scrollTo({ top: 0, behavior: mqReduce.matches ? "auto" : "smooth" }); });

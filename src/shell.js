@@ -66,7 +66,6 @@ root.innerHTML = `
   <nav class="sh-side sh-right" aria-label="Быстрые действия">
     <p class="sh-micro">Открыть сразу</p>
     <button type="button" class="sh-go go-pink" data-go="home"><span class="sh-go-ico">${I.cube}</span><span class="sh-go-t"><b>Конструктор</b><small>3D-модель и размеры</small></span></button>
-    <button type="button" class="sh-go go-dark" data-go="map"><span class="sh-go-ico">${I.pin}</span><span class="sh-go-t"><b>Карта пандусов</b><small>Замеры, заявки, установленные</small></span></button>
     <button type="button" class="sh-go go-lime" data-go="intake"><span class="sh-go-ico">${I.plus}</span><span class="sh-go-t"><b>Новый замер</b><small>Мастер, AR-примерка, отправка</small></span></button>
     <p class="sh-note">На телефоне приложение открывается сразу во весь экран, без рамки.</p>
   </nav>`;
