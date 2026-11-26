@@ -918,7 +918,7 @@ export function createIntake() {
       const S = T.steps[id], v = values(d);
       let o = `<h2 class="ik-title" tabindex="-1" data-ik-h>${esc(S.title)}</h2>${S.lead ? `<p class="ik-lead">${esc(S.lead)}</p>` : ""}`;
       if (id === "overview") {
-        o += mediaHTML("overview") + extraHTML();
+        o += mediaHTML("overview"); // «Где ещё нужен пандус» убрано с первого шага (Алхас, 26.11)
       } else if (id === "measure") {
         const W = T.slots.width, shown = d.width.trim() ? d.width : num(v.width);
         const same = v.freeWidth != null && v.width === v.freeWidth;
